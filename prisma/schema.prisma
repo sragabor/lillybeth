@@ -1,0 +1,293 @@
+// Prisma schema for Accommodation Booking Admin System
+// Database: PostgreSQL via Neon
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// AUTHENTICATION
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String // bcrypt hashed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ============================================
+// ACCOMMODATION HIERARCHY
+// ============================================
+
+model Building {
+  id          String  @id @default(cuid())
+  name        String
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  description String? @db.Text // Rich text content
+
+  // Booking conditions (rich text sections)
+  cancellationPolicy String? @db.Text
+  paymentMethods     String? @db.Text
+  depositInfo        String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  images            BuildingImage[]
+  houseRules        HouseRule[]
+  amenityCategories BuildingAmenityCategory[]
+  additionalPrices  BuildingAdditionalPrice[]
+  roomTypes         RoomType[]
+
+  @@map("buildings")
+}
+
+model BuildingImage {
+  id         String   @id @default(cuid())
+  url        String
+  order      Int      @default(0)
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@map("building_images")
+}
+
+model HouseRule {
+  id         String   @id @default(cuid())
+  key        String // e.g., "Check-out"
+  value      String // e.g., "10:00"
+  order      Int      @default(0)
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@map("house_rules")
+}
+
+model BuildingAmenityCategory {
+  id         String            @id @default(cuid())
+  name       String // e.g., "Kitchen", "Outdoor"
+  order      Int               @default(0)
+  buildingId String
+  building   Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  amenities  BuildingAmenity[]
+
+  @@map("building_amenity_categories")
+}
+
+model BuildingAmenity {
+  id         String                  @id @default(cuid())
+  name       String // e.g., "Dishwasher", "BBQ Grill"
+  order      Int                     @default(0)
+  categoryId String
+  category   BuildingAmenityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("building_amenities")
+}
+
+model BuildingAdditionalPrice {
+  id         String   @id @default(cuid())
+  title      String // e.g., "Cleaning fee"
+  priceEur   Float // Price in EUR
+  mandatory  Boolean  @default(false)
+  perNight   Boolean  @default(false) // true = per night, false = per booking
+  order      Int      @default(0)
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@map("building_additional_prices")
+}
+
+// ============================================
+// ROOM TYPES
+// ============================================
+
+model RoomType {
+  id         String   @id @default(cuid())
+  name       String
+  capacity   Int // Number of adults
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  images            RoomTypeImage[]
+  amenityCategories RoomTypeAmenityCategory[]
+  additionalPrices  RoomTypeAdditionalPrice[]
+  rooms             Room[]
+  dateRangePrices   DateRangePrice[]
+  calendarOverrides CalendarOverride[]
+
+  @@map("room_types")
+}
+
+model RoomTypeImage {
+  id         String   @id @default(cuid())
+  url        String
+  order      Int      @default(0)
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@map("room_type_images")
+}
+
+model RoomTypeAmenityCategory {
+  id         String            @id @default(cuid())
+  name       String
+  order      Int               @default(0)
+  roomTypeId String
+  roomType   RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  amenities  RoomTypeAmenity[]
+
+  @@map("room_type_amenity_categories")
+}
+
+model RoomTypeAmenity {
+  id         String                  @id @default(cuid())
+  name       String
+  order      Int                     @default(0)
+  categoryId String
+  category   RoomTypeAmenityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("room_type_amenities")
+}
+
+model RoomTypeAdditionalPrice {
+  id         String   @id @default(cuid())
+  title      String
+  priceEur   Float
+  mandatory  Boolean  @default(false)
+  perNight   Boolean  @default(false)
+  order      Int      @default(0)
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@map("room_type_additional_prices")
+}
+
+// ============================================
+// ROOMS
+// ============================================
+
+model Room {
+  id         String   @id @default(cuid())
+  name       String
+  isActive   Boolean  @default(true) // Inactive = visible in admin but not bookable online
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  bookings Booking[]
+
+  @@map("rooms")
+}
+
+// ============================================
+// PRICING
+// ============================================
+
+model DateRangePrice {
+  id           String   @id @default(cuid())
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  weekdayPrice Float // Sun-Thu price in EUR
+  weekendPrice Float // Fri-Sat price in EUR
+  minNights    Int      @default(1)
+  roomTypeId   String
+  roomType     RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("date_range_prices")
+}
+
+model CalendarOverride {
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date
+  price      Float? // Override price (null = use range price)
+  minNights  Int? // Override min nights (null = use range, 0 = no minimum)
+  isInactive Boolean  @default(false) // Day not bookable
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([roomTypeId, date])
+  @@map("calendar_overrides")
+}
+
+// ============================================
+// BOOKINGS
+// ============================================
+
+enum BookingSource {
+  WEBSITE // Yellow badge
+  BOOKING_COM // Blue badge
+  SZALLAS_HU // Orange badge
+  AIRBNB // Red badge
+}
+
+enum BookingStatus {
+  INCOMING // Grey - not confirmed
+  CONFIRMED // Green - confirmed
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  DEPOSIT_PAID
+  FULLY_PAID
+  REFUNDED
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  source        BookingSource
+  guestName     String
+  guestEmail    String?
+  guestPhone    String?
+  guestCount    Int // Number of guests
+  checkIn       DateTime      @db.Date // Check-in at 14:00
+  checkOut      DateTime      @db.Date // Check-out at 10:00
+  status        BookingStatus @default(INCOMING)
+  paymentStatus PaymentStatus @default(PENDING)
+  notes         String?       @db.Text
+  totalAmount   Float? // Total price in EUR
+  roomId        String
+  room          Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  additionalPrices BookingAdditionalPrice[]
+
+  @@map("bookings")
+}
+
+model BookingAdditionalPrice {
+  id        String  @id @default(cuid())
+  title     String
+  priceEur  Float
+  quantity  Int     @default(1)
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_additional_prices")
+}

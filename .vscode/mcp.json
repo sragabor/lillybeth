@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "Neon": {
+      "type": "http",
+      "url": "https://mcp.neon.tech/mcp",
+      "headers": {
+        "Authorization": "Bearer napi_3h38tq6wklk76vb5u2y34hankqaafdshioyd340dldta3l3p6djk794nzrkemk8q"
+      }
+    }
+  }
+}

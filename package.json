@@ -8,10 +8,22 @@
     "start": "next start",
     "lint": "next lint",
     "prepare": "husky install",
-    "commit": "git-cz"
+    "commit": "git-cz",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
     "next": "16.1.1",
+    "pg": "^8.16.3",
+    "prisma": "^7.2.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "sass": "^1.97.1"
@@ -20,12 +32,15 @@
     "@commitlint/cli": "^20.3.0",
     "@commitlint/config-conventional": "^20.3.0",
     "@tailwindcss/postcss": "^4.1.18",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.23",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.1.1",
     "eslint-config-prettier": "^10.1.8",
@@ -35,6 +50,7 @@
     "postcss": "^8",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   },
   "lint-staged": {
