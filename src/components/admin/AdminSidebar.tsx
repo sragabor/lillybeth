@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface AdminSidebarProps {
   user: {
@@ -31,6 +31,15 @@ const navItems = [
     ),
   },
   {
+    label: 'Pricing',
+    href: '/admin/pricing',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Bookings',
     href: '/admin/bookings',
     icon: (
@@ -54,6 +63,21 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [pathname])
+
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [])
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -63,7 +87,38 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-stone-200 flex flex-col">
+    <>
+      {/* Mobile header */}
+      <div className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-stone-200 flex items-center justify-between px-4 z-40 md:hidden">
+        <Link href="/admin" className="font-semibold text-stone-800">
+          Lillybeth Admin
+        </Link>
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+        >
+          {mobileMenuOpen ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Mobile menu overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 h-screen w-64 bg-white border-r border-stone-200 flex flex-col z-50 transform transition-transform duration-200 ease-in-out md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Logo */}
       <div className="p-6 border-b border-stone-100">
         <Link href="/admin" className="block">
@@ -118,5 +173,6 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
         </button>
       </div>
     </aside>
+    </>
   )
 }

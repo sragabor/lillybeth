@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 
+// GET all room types (grouped by building)
+export async function GET() {
+  const session = await getSession()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const roomTypes = await prisma.roomType.findMany({
+      include: {
+        building: { select: { id: true, name: true } },
+        rooms: { select: { id: true, name: true, isActive: true } },
+      },
+      orderBy: [
+        { building: { name: 'asc' } },
+        { name: 'asc' },
+      ],
+    })
+
+    return NextResponse.json({ roomTypes })
+  } catch (error) {
+    console.error('Error fetching room types:', error)
+    return NextResponse.json({ error: 'Failed to fetch room types' }, { status: 500 })
+  }
+}
+
 // POST create new room type
 export async function POST(request: NextRequest) {
   const session = await getSession()

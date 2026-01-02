@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 
@@ -17,7 +16,7 @@ export default async function AdminLayout({
       {session ? (
         <div className="flex">
           <AdminSidebar user={session} />
-          <main className="flex-1 ml-64 p-8">{children}</main>
+          <main className="flex-1 md:ml-64 p-4 md:p-8 pt-16 md:pt-8">{children}</main>
         </div>
       ) : (
         <>{children}</>
