@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { LocalizedText } from '@/lib/i18n'
+import { Prisma } from '@/generated/prisma'
 
 // GET single room type with all relations
 export async function GET(
@@ -55,13 +57,18 @@ export async function PUT(
   const { id } = await params
 
   try {
-    const data = await request.json()
+    const data = await request.json() as {
+      name: string
+      capacity: number
+      description?: LocalizedText
+    }
 
     const roomType = await prisma.roomType.update({
       where: { id },
       data: {
         name: data.name,
-        capacity: parseInt(data.capacity) || 2,
+        capacity: parseInt(String(data.capacity)) || 2,
+        description: data.description ? data.description as Prisma.InputJsonValue : Prisma.JsonNull,
       },
     })
 

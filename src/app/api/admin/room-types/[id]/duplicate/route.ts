@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { Prisma } from '@/generated/prisma'
 
 // POST duplicate room type (without images)
 export async function POST(
@@ -39,11 +40,11 @@ export async function POST(
         // Duplicate amenity categories
         amenityCategories: {
           create: original.amenityCategories.map((cat, i) => ({
-            name: cat.name,
+            name: cat.name as Prisma.InputJsonValue,
             order: i,
             amenities: {
               create: cat.amenities.map((amenity, j) => ({
-                name: amenity.name,
+                name: amenity.name as Prisma.InputJsonValue,
                 order: j,
               })),
             },
@@ -52,7 +53,7 @@ export async function POST(
         // Duplicate additional prices
         additionalPrices: {
           create: original.additionalPrices.map((price, i) => ({
-            title: price.title,
+            title: price.title as Prisma.InputJsonValue,
             priceEur: price.priceEur,
             mandatory: price.mandatory,
             perNight: price.perNight,

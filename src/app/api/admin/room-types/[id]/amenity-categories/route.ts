@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { LocalizedText } from '@/lib/i18n'
+import { Prisma } from '@/generated/prisma'
 
 interface AmenityInput {
-  name: string
+  name: LocalizedText
 }
 
 interface CategoryInput {
-  name: string
+  id?: string
+  name: LocalizedText
   amenities: AmenityInput[]
 }
 
@@ -26,19 +29,21 @@ export async function POST(
   try {
     const { categories } = await request.json() as { categories: CategoryInput[] }
 
+    // Delete existing categories (cascades to amenities)
     await prisma.roomTypeAmenityCategory.deleteMany({ where: { roomTypeId } })
 
+    // Create new categories with amenities
     if (categories && categories.length > 0) {
       for (let i = 0; i < categories.length; i++) {
         const cat = categories[i]
         await prisma.roomTypeAmenityCategory.create({
           data: {
             roomTypeId,
-            name: cat.name,
+            name: cat.name as Prisma.InputJsonValue,
             order: i,
             amenities: {
               create: cat.amenities.map((amenity, j) => ({
-                name: amenity.name,
+                name: amenity.name as Prisma.InputJsonValue,
                 order: j,
               })),
             },

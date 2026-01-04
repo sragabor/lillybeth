@@ -35,12 +35,12 @@ model Building {
   address     String?
   latitude    Float?
   longitude   Float?
-  description String? @db.Text // Rich text content
+  description Json?   @db.JsonB // Multilingual: {"en": "", "hu": "", "de": ""}
 
-  // Booking conditions (rich text sections)
-  cancellationPolicy String? @db.Text
-  paymentMethods     String? @db.Text
-  depositInfo        String? @db.Text
+  // Booking conditions (multilingual rich text)
+  cancellationPolicy Json? @db.JsonB // {"en": "", "hu": "", "de": ""}
+  paymentMethods     Json? @db.JsonB // {"en": "", "hu": "", "de": ""}
+  depositInfo        Json? @db.JsonB // {"en": "", "hu": "", "de": ""}
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -57,7 +57,8 @@ model Building {
 
 model BuildingImage {
   id         String   @id @default(cuid())
-  url        String
+  url        String   // Path to uploaded WebP file
+  filename   String   @default("") // Original filename
   order      Int      @default(0)
   buildingId String
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -68,8 +69,8 @@ model BuildingImage {
 
 model HouseRule {
   id         String   @id @default(cuid())
-  key        String // e.g., "Check-out"
-  value      String // e.g., "10:00"
+  key        Json     @db.JsonB // Multilingual: {"en": "Check-out", "hu": "Kijelentkezés", "de": "Abreise"}
+  value      Json     @db.JsonB // Multilingual: {"en": "10:00 AM", "hu": "10:00", "de": "10:00 Uhr"}
   order      Int      @default(0)
   buildingId String
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -79,7 +80,7 @@ model HouseRule {
 
 model BuildingAmenityCategory {
   id         String            @id @default(cuid())
-  name       String // e.g., "Kitchen", "Outdoor"
+  name       Json              @db.JsonB // Multilingual: {"en": "Kitchen", "hu": "Konyha", "de": "Küche"}
   order      Int               @default(0)
   buildingId String
   building   Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -90,7 +91,7 @@ model BuildingAmenityCategory {
 
 model BuildingAmenity {
   id         String                  @id @default(cuid())
-  name       String // e.g., "Dishwasher", "BBQ Grill"
+  name       Json                    @db.JsonB // Multilingual: {"en": "Dishwasher", "hu": "Mosogatógép", "de": "Geschirrspüler"}
   order      Int                     @default(0)
   categoryId String
   category   BuildingAmenityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -100,7 +101,7 @@ model BuildingAmenity {
 
 model BuildingAdditionalPrice {
   id         String   @id @default(cuid())
-  title      String // e.g., "Cleaning fee"
+  title      Json     @db.JsonB // Multilingual: {"en": "Cleaning fee", "hu": "Takarítási díj", "de": "Reinigungsgebühr"}
   priceEur   Float // Price in EUR
   mandatory  Boolean  @default(false)
   perNight   Boolean  @default(false) // true = per night, false = per booking
@@ -116,13 +117,14 @@ model BuildingAdditionalPrice {
 // ============================================
 
 model RoomType {
-  id         String   @id @default(cuid())
-  name       String
-  capacity   Int // Number of adults
-  buildingId String
-  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description Json?    @db.JsonB // NEW: Multilingual rich text description
+  capacity    Int // Number of adults
+  buildingId  String
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   images            RoomTypeImage[]
@@ -137,7 +139,8 @@ model RoomType {
 
 model RoomTypeImage {
   id         String   @id @default(cuid())
-  url        String
+  url        String   // Path to uploaded WebP file
+  filename   String   @default("") // Original filename
   order      Int      @default(0)
   roomTypeId String
   roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
@@ -148,7 +151,7 @@ model RoomTypeImage {
 
 model RoomTypeAmenityCategory {
   id         String            @id @default(cuid())
-  name       String
+  name       Json              @db.JsonB // Multilingual
   order      Int               @default(0)
   roomTypeId String
   roomType   RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
@@ -159,7 +162,7 @@ model RoomTypeAmenityCategory {
 
 model RoomTypeAmenity {
   id         String                  @id @default(cuid())
-  name       String
+  name       Json                    @db.JsonB // Multilingual
   order      Int                     @default(0)
   categoryId String
   category   RoomTypeAmenityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -169,7 +172,7 @@ model RoomTypeAmenity {
 
 model RoomTypeAdditionalPrice {
   id         String   @id @default(cuid())
-  title      String
+  title      Json     @db.JsonB // Multilingual
   priceEur   Float
   mandatory  Boolean  @default(false)
   perNight   Boolean  @default(false)
@@ -238,10 +241,11 @@ model CalendarOverride {
 // ============================================
 
 enum BookingSource {
-  WEBSITE // Yellow badge
+  MANUAL      // Default for admin-created bookings
+  WEBSITE     // Yellow badge
   BOOKING_COM // Blue badge
-  SZALLAS_HU // Orange badge
-  AIRBNB // Red badge
+  SZALLAS_HU  // Orange badge
+  AIRBNB      // Red badge
 }
 
 enum BookingStatus {
@@ -259,7 +263,7 @@ enum PaymentStatus {
 
 model Booking {
   id            String        @id @default(cuid())
-  source        BookingSource
+  source        BookingSource @default(MANUAL)
   guestName     String
   guestEmail    String?
   guestPhone    String?

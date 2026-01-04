@@ -90,6 +90,9 @@ export default function PricingPage() {
     isInactive: false,
   })
 
+  // Error state for modals
+  const [dateRangeError, setDateRangeError] = useState<string | null>(null)
+
   // Fetch room types on mount
   useEffect(() => {
     fetchRoomTypes()
@@ -159,6 +162,7 @@ export default function PricingPage() {
 
   // Date range CRUD
   const handleCreateDateRange = async () => {
+    setDateRangeError(null)
     try {
       const res = await fetch(`/api/admin/room-types/${selectedRoomTypeId}/date-range-prices`, {
         method: 'POST',
@@ -170,14 +174,24 @@ export default function PricingPage() {
         setShowDateRangeModal(false)
         setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1' })
         fetchPricingData()
+      } else {
+        const data = await res.json()
+        if (res.status === 409) {
+          // Overlap error
+          setDateRangeError(data.message || 'Date range overlaps with an existing range')
+        } else {
+          setDateRangeError(data.error || 'Failed to create date range')
+        }
       }
     } catch (error) {
       console.error('Error creating date range price:', error)
+      setDateRangeError('Failed to create date range')
     }
   }
 
   const handleUpdateDateRange = async () => {
     if (!editingDateRange) return
+    setDateRangeError(null)
 
     try {
       const res = await fetch(`/api/admin/date-range-prices/${editingDateRange.id}`, {
@@ -191,9 +205,18 @@ export default function PricingPage() {
         setEditingDateRange(null)
         setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1' })
         fetchPricingData()
+      } else {
+        const data = await res.json()
+        if (res.status === 409) {
+          // Overlap error
+          setDateRangeError(data.message || 'Date range overlaps with an existing range')
+        } else {
+          setDateRangeError(data.error || 'Failed to update date range')
+        }
       }
     } catch (error) {
       console.error('Error updating date range price:', error)
+      setDateRangeError('Failed to update date range')
     }
   }
 
@@ -215,6 +238,7 @@ export default function PricingPage() {
 
   const openEditDateRange = (dateRange: DateRangePrice) => {
     setEditingDateRange(dateRange)
+    setDateRangeError(null)
     setDateRangeForm({
       startDate: dateRange.startDate.split('T')[0],
       endDate: dateRange.endDate.split('T')[0],
@@ -455,6 +479,7 @@ export default function PricingPage() {
           <button
             onClick={() => {
               setEditingDateRange(null)
+              setDateRangeError(null)
               setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1' })
               setShowDateRangeModal(true)
             }}
@@ -711,6 +736,13 @@ export default function PricingPage() {
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
               </div>
+
+              {/* Error Message */}
+              {dateRangeError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                  {dateRangeError}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
@@ -718,6 +750,7 @@ export default function PricingPage() {
                 onClick={() => {
                   setShowDateRangeModal(false)
                   setEditingDateRange(null)
+                  setDateRangeError(null)
                 }}
                 className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
               >

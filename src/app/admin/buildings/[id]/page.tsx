@@ -2,28 +2,35 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { LocalizedText } from '@/lib/i18n'
+import { createEmptyLocalizedText, getLocalizedText } from '@/lib/i18n/utils'
+import { useLanguage } from '@/contexts/LanguageContext'
+import { MultilingualRichText } from '@/components/ui/MultilingualRichText'
+import { MultilingualTextInput } from '@/components/ui/MultilingualTextInput'
+import { ImageUploader } from '@/components/ui/ImageUploader'
+import { ImageGallery, GalleryImage } from '@/components/ui/ImageGallery'
+import { UPLOAD_CONFIG } from '@/lib/upload/config'
 
 interface Amenity {
   id: string
-  name: string
+  name: LocalizedText
 }
 
 interface AmenityCategory {
   id: string
-  name: string
+  name: LocalizedText
   amenities: Amenity[]
 }
 
 interface HouseRule {
   id: string
-  key: string
-  value: string
+  key: LocalizedText
+  value: LocalizedText
 }
 
 interface AdditionalPrice {
   id: string
-  title: string
+  title: LocalizedText
   priceEur: number
   mandatory: boolean
   perNight: boolean
@@ -32,6 +39,8 @@ interface AdditionalPrice {
 interface BuildingImage {
   id: string
   url: string
+  filename: string
+  order: number
 }
 
 interface Room {
@@ -54,10 +63,10 @@ interface Building {
   address: string | null
   latitude: number | null
   longitude: number | null
-  description: string | null
-  cancellationPolicy: string | null
-  paymentMethods: string | null
-  depositInfo: string | null
+  description: LocalizedText | null
+  cancellationPolicy: LocalizedText | null
+  paymentMethods: LocalizedText | null
+  depositInfo: LocalizedText | null
   images: BuildingImage[]
   houseRules: HouseRule[]
   amenityCategories: AmenityCategory[]
@@ -69,11 +78,12 @@ type TabType = 'general' | 'images' | 'rules' | 'amenities' | 'conditions' | 'pr
 
 export default function BuildingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const router = useRouter()
+  const { language } = useLanguage()
   const [building, setBuilding] = useState<Building | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('general')
+  const [error, setError] = useState<string | null>(null)
 
   // Form states
   const [generalForm, setGeneralForm] = useState({
@@ -81,16 +91,16 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
     address: '',
     latitude: '',
     longitude: '',
-    description: '',
-    cancellationPolicy: '',
-    paymentMethods: '',
-    depositInfo: '',
   })
+  const [description, setDescription] = useState<LocalizedText>(createEmptyLocalizedText())
+  const [cancellationPolicy, setCancellationPolicy] = useState<LocalizedText>(createEmptyLocalizedText())
+  const [paymentMethods, setPaymentMethods] = useState<LocalizedText>(createEmptyLocalizedText())
+  const [depositInfo, setDepositInfo] = useState<LocalizedText>(createEmptyLocalizedText())
 
-  const [houseRules, setHouseRules] = useState<{ key: string; value: string }[]>([])
-  const [amenityCategories, setAmenityCategories] = useState<{ name: string; amenities: { name: string }[] }[]>([])
-  const [additionalPrices, setAdditionalPrices] = useState<{ title: string; priceEur: number; mandatory: boolean; perNight: boolean }[]>([])
-  const [images, setImages] = useState<{ url: string }[]>([])
+  const [houseRules, setHouseRules] = useState<{ key: LocalizedText; value: LocalizedText }[]>([])
+  const [amenityCategories, setAmenityCategories] = useState<{ name: LocalizedText; amenities: { name: LocalizedText }[] }[]>([])
+  const [additionalPrices, setAdditionalPrices] = useState<{ title: LocalizedText; priceEur: number; mandatory: boolean; perNight: boolean }[]>([])
+  const [images, setImages] = useState<GalleryImage[]>([])
 
   // Room type modal
   const [showRoomTypeModal, setShowRoomTypeModal] = useState(false)
@@ -110,32 +120,41 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
       const res = await fetch(`/api/admin/buildings/${id}`)
       const data = await res.json()
       if (data.building) {
-        setBuilding(data.building)
+        const b = data.building as Building
+        setBuilding(b)
         setGeneralForm({
-          name: data.building.name || '',
-          address: data.building.address || '',
-          latitude: data.building.latitude?.toString() || '',
-          longitude: data.building.longitude?.toString() || '',
-          description: data.building.description || '',
-          cancellationPolicy: data.building.cancellationPolicy || '',
-          paymentMethods: data.building.paymentMethods || '',
-          depositInfo: data.building.depositInfo || '',
+          name: b.name || '',
+          address: b.address || '',
+          latitude: b.latitude?.toString() || '',
+          longitude: b.longitude?.toString() || '',
         })
-        setHouseRules(data.building.houseRules.map((r: HouseRule) => ({ key: r.key, value: r.value })))
-        setAmenityCategories(data.building.amenityCategories.map((c: AmenityCategory) => ({
-          name: c.name,
-          amenities: c.amenities.map((a: Amenity) => ({ name: a.name })),
+        setDescription(b.description || createEmptyLocalizedText())
+        setCancellationPolicy(b.cancellationPolicy || createEmptyLocalizedText())
+        setPaymentMethods(b.paymentMethods || createEmptyLocalizedText())
+        setDepositInfo(b.depositInfo || createEmptyLocalizedText())
+        setHouseRules(b.houseRules.map((r) => ({
+          key: r.key || createEmptyLocalizedText(),
+          value: r.value || createEmptyLocalizedText(),
         })))
-        setAdditionalPrices(data.building.additionalPrices.map((p: AdditionalPrice) => ({
-          title: p.title,
+        setAmenityCategories(b.amenityCategories.map((c) => ({
+          name: c.name || createEmptyLocalizedText(),
+          amenities: c.amenities.map((a) => ({ name: a.name || createEmptyLocalizedText() })),
+        })))
+        setAdditionalPrices(b.additionalPrices.map((p) => ({
+          title: p.title || createEmptyLocalizedText(),
           priceEur: p.priceEur,
           mandatory: p.mandatory,
           perNight: p.perNight,
         })))
-        setImages(data.building.images.map((i: BuildingImage) => ({ url: i.url })))
+        setImages(b.images.map((i) => ({
+          id: i.id,
+          url: i.url,
+          filename: i.filename,
+          order: i.order,
+        })))
       }
     } catch {
-      console.error('Failed to fetch building')
+      setError('Failed to fetch building')
     } finally {
       setLoading(false)
     }
@@ -143,15 +162,22 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
   const saveGeneral = async () => {
     setSaving(true)
+    setError(null)
     try {
       await fetch(`/api/admin/buildings/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(generalForm),
+        body: JSON.stringify({
+          ...generalForm,
+          description,
+          cancellationPolicy,
+          paymentMethods,
+          depositInfo,
+        }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to save')
+      setError('Failed to save')
     } finally {
       setSaving(false)
     }
@@ -159,15 +185,19 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
   const saveHouseRules = async () => {
     setSaving(true)
+    setError(null)
     try {
+      const validRules = houseRules.filter(r =>
+        getLocalizedText(r.key, 'en') || getLocalizedText(r.value, 'en')
+      )
       await fetch(`/api/admin/buildings/${id}/house-rules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rules: houseRules.filter(r => r.key && r.value) }),
+        body: JSON.stringify({ rules: validRules }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to save')
+      setError('Failed to save')
     } finally {
       setSaving(false)
     }
@@ -175,15 +205,17 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
   const saveAmenities = async () => {
     setSaving(true)
+    setError(null)
     try {
+      const validCategories = amenityCategories.filter(c => getLocalizedText(c.name, 'en'))
       await fetch(`/api/admin/buildings/${id}/amenity-categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categories: amenityCategories.filter(c => c.name) }),
+        body: JSON.stringify({ categories: validCategories }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to save')
+      setError('Failed to save')
     } finally {
       setSaving(false)
     }
@@ -191,15 +223,17 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
   const savePrices = async () => {
     setSaving(true)
+    setError(null)
     try {
+      const validPrices = additionalPrices.filter(p => getLocalizedText(p.title, 'en'))
       await fetch(`/api/admin/buildings/${id}/additional-prices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prices: additionalPrices.filter(p => p.title) }),
+        body: JSON.stringify({ prices: validPrices }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to save')
+      setError('Failed to save')
     } finally {
       setSaving(false)
     }
@@ -207,18 +241,44 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
   const saveImages = async () => {
     setSaving(true)
+    setError(null)
     try {
       await fetch(`/api/admin/buildings/${id}/images`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images: images.filter(i => i.url) }),
+        body: JSON.stringify({
+          images: images.map((img, index) => ({
+            id: img.id,
+            url: img.url,
+            filename: img.filename,
+            order: index,
+          })),
+        }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to save')
+      setError('Failed to save')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleImageUpload = (image: { url: string; filename: string }) => {
+    const newImage: GalleryImage = {
+      id: `temp-${Date.now()}`,
+      url: image.url,
+      filename: image.filename,
+      order: images.length,
+    }
+    setImages([...images, newImage])
+  }
+
+  const handleImageReorder = (reorderedImages: GalleryImage[]) => {
+    setImages(reorderedImages)
+  }
+
+  const handleImageDelete = async (imageId: string) => {
+    setImages(images.filter(img => img.id !== imageId))
   }
 
   const createRoomType = async () => {
@@ -235,9 +295,9 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
       setShowRoomTypeModal(false)
       setNewRoomTypeName('')
       setNewRoomTypeCapacity('2')
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to create room type')
+      setError('Failed to create room type')
     }
   }
 
@@ -253,9 +313,9 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
       })
       setShowRoomModal(null)
       setNewRoomName('')
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to create room')
+      setError('Failed to create room')
     }
   }
 
@@ -266,9 +326,9 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !isActive }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to update room')
+      setError('Failed to update room')
     }
   }
 
@@ -279,9 +339,9 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: true }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to delete room')
+      setError('Failed to delete room')
     }
   }
 
@@ -292,9 +352,9 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: true }),
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to delete room type')
+      setError('Failed to delete room type')
     }
   }
 
@@ -303,9 +363,9 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
       await fetch(`/api/admin/room-types/${roomTypeId}/duplicate`, {
         method: 'POST',
       })
-      fetchBuilding()
+      await fetchBuilding()
     } catch {
-      console.error('Failed to duplicate room type')
+      setError('Failed to duplicate room type')
     }
   }
 
@@ -344,6 +404,13 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
           <p className="text-stone-500">{building.address || 'No address set'}</p>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">
+          {error}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 overflow-x-auto pb-2">
@@ -408,16 +475,13 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
                 />
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">Description</label>
-              <textarea
-                value={generalForm.description}
-                onChange={(e) => setGeneralForm({ ...generalForm, description: e.target.value })}
-                rows={6}
-                className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                placeholder="Rich description of the property..."
-              />
-            </div>
+            <MultilingualRichText
+              label="Description"
+              value={description}
+              onChange={setDescription}
+              placeholder="Rich description of the property"
+              rows={6}
+            />
             <button
               onClick={saveGeneral}
               disabled={saving}
@@ -430,39 +494,25 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* Images Tab */}
         {activeTab === 'images' && (
-          <div className="space-y-4">
-            <p className="text-sm text-stone-500 mb-4">Add image URLs. Drag to reorder (first image is the cover).</p>
-            {images.map((img, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <span className="text-stone-400 text-sm w-6">{index + 1}</span>
-                <input
-                  type="url"
-                  value={img.url}
-                  onChange={(e) => {
-                    const newImages = [...images]
-                    newImages[index].url = e.target.value
-                    setImages(newImages)
-                  }}
-                  className="flex-1 px-4 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
-                  placeholder="https://..."
-                />
-                <button
-                  onClick={() => setImages(images.filter((_, i) => i !== index))}
-                  className="p-2 text-stone-400 hover:text-red-500 rounded-lg"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => setImages([...images, { url: '' }])}
-              className="text-amber-600 hover:text-amber-700 text-sm font-medium"
-            >
-              + Add Image
-            </button>
-            <div className="pt-4">
+          <div className="space-y-6">
+            <p className="text-sm text-stone-500 mb-4">
+              Upload images for this building. Drag to reorder (first image is the cover).
+            </p>
+
+            <ImageUploader
+              onUpload={handleImageUpload}
+              onError={(err) => setError(err)}
+              directory={UPLOAD_CONFIG.paths.buildings}
+              prefix={`building-${id}`}
+            />
+
+            <ImageGallery
+              images={images}
+              onReorder={handleImageReorder}
+              onDelete={handleImageDelete}
+            />
+
+            {images.length > 0 && (
               <button
                 onClick={saveImages}
                 disabled={saving}
@@ -470,50 +520,55 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
               >
                 {saving ? 'Saving...' : 'Save Images'}
               </button>
-            </div>
+            )}
           </div>
         )}
 
         {/* House Rules Tab */}
         {activeTab === 'rules' && (
-          <div className="space-y-4">
-            <p className="text-sm text-stone-500 mb-4">Key-value pairs like &quot;Check-in&quot; → &quot;14:00&quot;</p>
+          <div className="space-y-6">
+            <p className="text-sm text-stone-500 mb-4">
+              Key-value pairs like &quot;Check-in&quot; → &quot;14:00&quot;. Each field supports multiple languages.
+            </p>
             {houseRules.map((rule, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={rule.key}
-                  onChange={(e) => {
-                    const newRules = [...houseRules]
-                    newRules[index].key = e.target.value
-                    setHouseRules(newRules)
-                  }}
-                  className="w-1/3 px-4 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
-                  placeholder="Key (e.g., Check-out)"
-                />
-                <input
-                  type="text"
-                  value={rule.value}
-                  onChange={(e) => {
-                    const newRules = [...houseRules]
-                    newRules[index].value = e.target.value
-                    setHouseRules(newRules)
-                  }}
-                  className="flex-1 px-4 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
-                  placeholder="Value (e.g., 10:00)"
-                />
-                <button
-                  onClick={() => setHouseRules(houseRules.filter((_, i) => i !== index))}
-                  className="p-2 text-stone-400 hover:text-red-500 rounded-lg"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <div key={index} className="border border-stone-200 rounded-xl p-4">
+                <div className="flex justify-between items-start mb-4">
+                  <span className="text-sm font-medium text-stone-600">Rule {index + 1}</span>
+                  <button
+                    onClick={() => setHouseRules(houseRules.filter((_, i) => i !== index))}
+                    className="p-1 text-stone-400 hover:text-red-500 rounded"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <MultilingualTextInput
+                    label="Key"
+                    value={rule.key}
+                    onChange={(value) => {
+                      const newRules = [...houseRules]
+                      newRules[index].key = value
+                      setHouseRules(newRules)
+                    }}
+                    placeholder="e.g., Check-out"
+                  />
+                  <MultilingualTextInput
+                    label="Value"
+                    value={rule.value}
+                    onChange={(value) => {
+                      const newRules = [...houseRules]
+                      newRules[index].value = value
+                      setHouseRules(newRules)
+                    }}
+                    placeholder="e.g., 10:00"
+                  />
+                </div>
               </div>
             ))}
             <button
-              onClick={() => setHouseRules([...houseRules, { key: '', value: '' }])}
+              onClick={() => setHouseRules([...houseRules, { key: createEmptyLocalizedText(), value: createEmptyLocalizedText() }])}
               className="text-amber-600 hover:text-amber-700 text-sm font-medium"
             >
               + Add Rule
@@ -533,51 +588,55 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
         {/* Amenities Tab */}
         {activeTab === 'amenities' && (
           <div className="space-y-6">
-            <p className="text-sm text-stone-500 mb-4">Organize amenities into categories</p>
+            <p className="text-sm text-stone-500 mb-4">Organize amenities into categories. Names support multiple languages.</p>
             {amenityCategories.map((cat, catIndex) => (
               <div key={catIndex} className="border border-stone-200 rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="text"
-                    value={cat.name}
-                    onChange={(e) => {
-                      const newCats = [...amenityCategories]
-                      newCats[catIndex].name = e.target.value
-                      setAmenityCategories(newCats)
-                    }}
-                    className="flex-1 px-4 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-medium"
-                    placeholder="Category name (e.g., Kitchen)"
-                  />
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex-1">
+                    <MultilingualTextInput
+                      label="Category Name"
+                      value={cat.name}
+                      onChange={(value) => {
+                        const newCats = [...amenityCategories]
+                        newCats[catIndex].name = value
+                        setAmenityCategories(newCats)
+                      }}
+                      placeholder="e.g., Kitchen"
+                    />
+                  </div>
                   <button
                     onClick={() => setAmenityCategories(amenityCategories.filter((_, i) => i !== catIndex))}
-                    className="p-2 text-stone-400 hover:text-red-500 rounded-lg"
+                    className="p-2 text-stone-400 hover:text-red-500 rounded-lg mt-6"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-                <div className="pl-4 space-y-2">
+                <div className="pl-4 space-y-3">
+                  <p className="text-xs font-medium text-stone-500 uppercase">Amenities</p>
                   {cat.amenities.map((amenity, amenityIndex) => (
-                    <div key={amenityIndex} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={amenity.name}
-                        onChange={(e) => {
-                          const newCats = [...amenityCategories]
-                          newCats[catIndex].amenities[amenityIndex].name = e.target.value
-                          setAmenityCategories(newCats)
-                        }}
-                        className="flex-1 px-3 py-1.5 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                        placeholder="Amenity name"
-                      />
+                    <div key={amenityIndex} className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <MultilingualTextInput
+                          label=""
+                          value={amenity.name}
+                          onChange={(value) => {
+                            const newCats = [...amenityCategories]
+                            newCats[catIndex].amenities[amenityIndex].name = value
+                            setAmenityCategories(newCats)
+                          }}
+                          placeholder="Amenity name"
+                          compact
+                        />
+                      </div>
                       <button
                         onClick={() => {
                           const newCats = [...amenityCategories]
                           newCats[catIndex].amenities = newCats[catIndex].amenities.filter((_, i) => i !== amenityIndex)
                           setAmenityCategories(newCats)
                         }}
-                        className="p-1 text-stone-400 hover:text-red-500 rounded"
+                        className="p-1 text-stone-400 hover:text-red-500 rounded mt-1"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -588,7 +647,7 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
                   <button
                     onClick={() => {
                       const newCats = [...amenityCategories]
-                      newCats[catIndex].amenities.push({ name: '' })
+                      newCats[catIndex].amenities.push({ name: createEmptyLocalizedText() })
                       setAmenityCategories(newCats)
                     }}
                     className="text-amber-600 hover:text-amber-700 text-sm"
@@ -599,7 +658,7 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
               </div>
             ))}
             <button
-              onClick={() => setAmenityCategories([...amenityCategories, { name: '', amenities: [] }])}
+              onClick={() => setAmenityCategories([...amenityCategories, { name: createEmptyLocalizedText(), amenities: [] }])}
               className="text-amber-600 hover:text-amber-700 text-sm font-medium"
             >
               + Add Category
@@ -619,36 +678,27 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
         {/* Booking Conditions Tab */}
         {activeTab === 'conditions' && (
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">Cancellation Policy</label>
-              <textarea
-                value={generalForm.cancellationPolicy}
-                onChange={(e) => setGeneralForm({ ...generalForm, cancellationPolicy: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                placeholder="Describe your cancellation policy..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">Payment Methods</label>
-              <textarea
-                value={generalForm.paymentMethods}
-                onChange={(e) => setGeneralForm({ ...generalForm, paymentMethods: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                placeholder="List accepted payment methods..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">Deposit Information</label>
-              <textarea
-                value={generalForm.depositInfo}
-                onChange={(e) => setGeneralForm({ ...generalForm, depositInfo: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                placeholder="Describe deposit requirements..."
-              />
-            </div>
+            <MultilingualRichText
+              label="Cancellation Policy"
+              value={cancellationPolicy}
+              onChange={setCancellationPolicy}
+              placeholder="Describe your cancellation policy"
+              rows={4}
+            />
+            <MultilingualRichText
+              label="Payment Methods"
+              value={paymentMethods}
+              onChange={setPaymentMethods}
+              placeholder="List accepted payment methods"
+              rows={4}
+            />
+            <MultilingualRichText
+              label="Deposit Information"
+              value={depositInfo}
+              onChange={setDepositInfo}
+              placeholder="Describe deposit requirements"
+              rows={4}
+            />
             <button
               onClick={saveGeneral}
               disabled={saving}
@@ -661,73 +711,79 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* Additional Prices Tab */}
         {activeTab === 'prices' && (
-          <div className="space-y-4">
-            <p className="text-sm text-stone-500 mb-4">Extra charges like cleaning fees, pet fees, etc.</p>
+          <div className="space-y-6">
+            <p className="text-sm text-stone-500 mb-4">Extra charges like cleaning fees, pet fees, etc. Titles support multiple languages.</p>
             {additionalPrices.map((price, index) => (
-              <div key={index} className="flex items-center gap-3 flex-wrap">
-                <input
-                  type="text"
-                  value={price.title}
-                  onChange={(e) => {
-                    const newPrices = [...additionalPrices]
-                    newPrices[index].title = e.target.value
-                    setAdditionalPrices(newPrices)
-                  }}
-                  className="flex-1 min-w-[200px] px-4 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
-                  placeholder="Title (e.g., Cleaning fee)"
-                />
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    value={price.priceEur}
-                    onChange={(e) => {
-                      const newPrices = [...additionalPrices]
-                      newPrices[index].priceEur = parseFloat(e.target.value) || 0
-                      setAdditionalPrices(newPrices)
-                    }}
-                    className="w-24 px-3 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
-                    placeholder="0"
-                  />
-                  <span className="text-stone-500 text-sm">EUR</span>
+              <div key={index} className="border border-stone-200 rounded-xl p-4">
+                <div className="flex justify-between items-start mb-4">
+                  <span className="text-sm font-medium text-stone-600">Price {index + 1}</span>
+                  <button
+                    onClick={() => setAdditionalPrices(additionalPrices.filter((_, i) => i !== index))}
+                    className="p-1 text-stone-400 hover:text-red-500 rounded"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={price.mandatory}
-                    onChange={(e) => {
+                <div className="space-y-4">
+                  <MultilingualTextInput
+                    label="Title"
+                    value={price.title}
+                    onChange={(value) => {
                       const newPrices = [...additionalPrices]
-                      newPrices[index].mandatory = e.target.checked
+                      newPrices[index].title = value
                       setAdditionalPrices(newPrices)
                     }}
-                    className="rounded border-stone-300"
+                    placeholder="e.g., Cleaning fee"
                   />
-                  Mandatory
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={price.perNight}
-                    onChange={(e) => {
-                      const newPrices = [...additionalPrices]
-                      newPrices[index].perNight = e.target.checked
-                      setAdditionalPrices(newPrices)
-                    }}
-                    className="rounded border-stone-300"
-                  />
-                  Per Night
-                </label>
-                <button
-                  onClick={() => setAdditionalPrices(additionalPrices.filter((_, i) => i !== index))}
-                  className="p-2 text-stone-400 hover:text-red-500 rounded-lg"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={price.priceEur}
+                        onChange={(e) => {
+                          const newPrices = [...additionalPrices]
+                          newPrices[index].priceEur = parseFloat(e.target.value) || 0
+                          setAdditionalPrices(newPrices)
+                        }}
+                        className="w-24 px-3 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
+                        placeholder="0"
+                      />
+                      <span className="text-stone-500 text-sm">EUR</span>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={price.mandatory}
+                        onChange={(e) => {
+                          const newPrices = [...additionalPrices]
+                          newPrices[index].mandatory = e.target.checked
+                          setAdditionalPrices(newPrices)
+                        }}
+                        className="rounded border-stone-300"
+                      />
+                      Mandatory
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={price.perNight}
+                        onChange={(e) => {
+                          const newPrices = [...additionalPrices]
+                          newPrices[index].perNight = e.target.checked
+                          setAdditionalPrices(newPrices)
+                        }}
+                        className="rounded border-stone-300"
+                      />
+                      Per Night
+                    </label>
+                  </div>
+                </div>
               </div>
             ))}
             <button
-              onClick={() => setAdditionalPrices([...additionalPrices, { title: '', priceEur: 0, mandatory: false, perNight: false }])}
+              onClick={() => setAdditionalPrices([...additionalPrices, { title: createEmptyLocalizedText(), priceEur: 0, mandatory: false, perNight: false }])}
               className="text-amber-600 hover:text-amber-700 text-sm font-medium"
             >
               + Add Price
@@ -787,6 +843,15 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/room-types/${roomType.id}`}
+                          className="p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                          title="Edit Details"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </Link>
                         <button
                           onClick={() => duplicateRoomType(roomType.id)}
                           className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"

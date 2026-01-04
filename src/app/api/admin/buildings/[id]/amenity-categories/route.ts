@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { LocalizedText } from '@/lib/i18n'
+import { Prisma } from '@/generated/prisma'
 
 interface AmenityInput {
-  name: string
+  name: LocalizedText
 }
 
 interface CategoryInput {
   id?: string
-  name: string
+  name: LocalizedText
   amenities: AmenityInput[]
 }
 
@@ -37,11 +39,11 @@ export async function POST(
         await prisma.buildingAmenityCategory.create({
           data: {
             buildingId,
-            name: cat.name,
+            name: cat.name as Prisma.InputJsonValue,
             order: i,
             amenities: {
               create: cat.amenities.map((amenity, j) => ({
-                name: amenity.name,
+                name: amenity.name as Prisma.InputJsonValue,
                 order: j,
               })),
             },

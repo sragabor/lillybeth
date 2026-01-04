@@ -38,7 +38,7 @@ interface BookingAdditionalPrice {
 
 interface Booking {
   id: string
-  source: 'WEBSITE' | 'BOOKING_COM' | 'SZALLAS_HU' | 'AIRBNB'
+  source: 'MANUAL' | 'WEBSITE' | 'BOOKING_COM' | 'SZALLAS_HU' | 'AIRBNB'
   guestName: string
   guestEmail: string | null
   guestPhone: string | null
@@ -67,6 +67,7 @@ const ROOM_COLUMN_WIDTH = 200 // left sidebar width
 const HEADER_HEIGHT = 60 // top header height
 
 const SOURCE_COLORS = {
+  MANUAL: { bg: 'bg-stone-100', border: 'border-stone-400', text: 'text-stone-800', badge: 'bg-stone-400' },
   WEBSITE: { bg: 'bg-yellow-100', border: 'border-yellow-400', text: 'text-yellow-800', badge: 'bg-yellow-400' },
   BOOKING_COM: { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-800', badge: 'bg-blue-400' },
   SZALLAS_HU: { bg: 'bg-orange-100', border: 'border-orange-400', text: 'text-orange-800', badge: 'bg-orange-400' },
@@ -74,6 +75,7 @@ const SOURCE_COLORS = {
 }
 
 const SOURCE_LABELS = {
+  MANUAL: 'Manual',
   WEBSITE: 'Website',
   BOOKING_COM: 'Booking.com',
   SZALLAS_HU: 'Szállás.hu',
@@ -97,9 +99,9 @@ export default function BookingsPage() {
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(() => {
-    const today = new Date()
-    today.setDate(today.getDate() - 3) // Start 3 days ago
-    return today.toISOString().split('T')[0]
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1) // Start from yesterday
+    return yesterday.toISOString().split('T')[0]
   })
   const [daysToShow, setDaysToShow] = useState(30)
 
@@ -120,7 +122,7 @@ export default function BookingsPage() {
   // Form state
   const [bookingForm, setBookingForm] = useState({
     roomId: '',
-    source: 'WEBSITE' as Booking['source'],
+    source: 'MANUAL' as Booking['source'],
     guestName: '',
     guestEmail: '',
     guestPhone: '',
@@ -135,6 +137,20 @@ export default function BookingsPage() {
 
   // Available rooms for booking form
   const [availableRooms, setAvailableRooms] = useState<{ room: Room; building: string; roomType: string }[]>([])
+
+  // Price calculation state
+  const [calculatingPrice, setCalculatingPrice] = useState(false)
+  const [priceBreakdown, setPriceBreakdown] = useState<{
+    nights: number
+    accommodationTotal: number
+    additionalTotal: number
+    grandTotal: number
+  } | null>(null)
+
+  // Drag and drop state
+  const [draggingBooking, setDraggingBooking] = useState<Booking | null>(null)
+  const [dragOverRoom, setDragOverRoom] = useState<string | null>(null)
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null)
 
   const endDate = useCallback(() => {
     const end = new Date(startDate)
@@ -212,22 +228,60 @@ export default function BookingsPage() {
   }
 
   const goToToday = () => {
-    const today = new Date()
-    today.setDate(today.getDate() - 3)
-    setStartDate(today.toISOString().split('T')[0])
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    setStartDate(yesterday.toISOString().split('T')[0])
 
-    // Scroll to today
+    // Scroll to today (today is 1 day after yesterday start)
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = 3 * DAY_WIDTH - 50
+      scrollContainerRef.current.scrollLeft = DAY_WIDTH - 50
+    }
+  }
+
+  // Calculate price for booking
+  const calculatePrice = async () => {
+    if (!bookingForm.roomId || !bookingForm.checkIn || !bookingForm.checkOut) {
+      alert('Please select a room and dates first')
+      return
+    }
+
+    setCalculatingPrice(true)
+    try {
+      const res = await fetch('/api/admin/bookings/calculate-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: bookingForm.roomId,
+          checkIn: bookingForm.checkIn,
+          checkOut: bookingForm.checkOut,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setPriceBreakdown(data.breakdown)
+        setBookingForm({
+          ...bookingForm,
+          totalAmount: data.breakdown.grandTotal.toString(),
+        })
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to calculate price')
+      }
+    } catch (error) {
+      console.error('Error calculating price:', error)
+    } finally {
+      setCalculatingPrice(false)
     }
   }
 
   // Open booking modal
   const openCreateBooking = (roomId?: string, date?: string) => {
     setEditingBooking(null)
+    setPriceBreakdown(null)
     setBookingForm({
       roomId: roomId || '',
-      source: 'WEBSITE',
+      source: 'MANUAL',
       guestName: '',
       guestEmail: '',
       guestPhone: '',
@@ -244,6 +298,7 @@ export default function BookingsPage() {
 
   const openEditBooking = (booking: Booking) => {
     setEditingBooking(booking)
+    setPriceBreakdown(null)
     setBookingForm({
       roomId: booking.roomId,
       source: booking.source,
@@ -309,8 +364,74 @@ export default function BookingsPage() {
 
   // Handle hover
   const handleBookingHover = (booking: Booking, e: React.MouseEvent) => {
+    if (draggingBooking) return // Don't show hover during drag
     setHoveredBooking(booking)
     setHoverPosition({ x: e.clientX, y: e.clientY })
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (booking: Booking, e: React.DragEvent) => {
+    setDraggingBooking(booking)
+    setHoveredBooking(null)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', booking.id)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingBooking(null)
+    setDragOverRoom(null)
+    setDragOverDate(null)
+  }
+
+  const handleDragOver = (roomId: string, date: string, e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverRoom(roomId)
+    setDragOverDate(date)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverRoom(null)
+    setDragOverDate(null)
+  }
+
+  const handleDrop = async (roomId: string, date: string, e: React.DragEvent) => {
+    e.preventDefault()
+    if (!draggingBooking) return
+
+    // Calculate new check-in/check-out dates
+    const originalCheckIn = new Date(draggingBooking.checkIn)
+    const originalCheckOut = new Date(draggingBooking.checkOut)
+    const nights = Math.ceil((originalCheckOut.getTime() - originalCheckIn.getTime()) / (1000 * 60 * 60 * 24))
+
+    const newCheckIn = new Date(date)
+    const newCheckOut = new Date(date)
+    newCheckOut.setDate(newCheckOut.getDate() + nights)
+
+    try {
+      const res = await fetch(`/api/admin/bookings/${draggingBooking.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          checkIn: newCheckIn.toISOString().split('T')[0],
+          checkOut: newCheckOut.toISOString().split('T')[0],
+        }),
+      })
+
+      if (res.ok) {
+        fetchTimelineData()
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to move booking')
+      }
+    } catch (error) {
+      console.error('Error moving booking:', error)
+    } finally {
+      setDraggingBooking(null)
+      setDragOverRoom(null)
+      setDragOverDate(null)
+    }
   }
 
   // Get all rooms flattened
@@ -578,21 +699,30 @@ export default function BookingsPage() {
                 />
               ))}
 
-              {/* Click areas for creating bookings */}
+              {/* Click areas for creating bookings and drop targets */}
               {allRooms.map(({ room }, roomIndex) => (
-                dates.map((date, dateIndex) => (
-                  <div
-                    key={`click-${room.id}-${dateIndex}`}
-                    className="absolute cursor-pointer hover:bg-stone-100/50 transition-colors"
-                    style={{
-                      left: dateIndex * DAY_WIDTH,
-                      top: roomIndex * ROOM_HEIGHT,
-                      width: DAY_WIDTH,
-                      height: ROOM_HEIGHT,
-                    }}
-                    onClick={() => openCreateBooking(room.id, date.toISOString().split('T')[0])}
-                  />
-                ))
+                dates.map((date, dateIndex) => {
+                  const dateStr = date.toISOString().split('T')[0]
+                  const isDropTarget = dragOverRoom === room.id && dragOverDate === dateStr
+                  return (
+                    <div
+                      key={`click-${room.id}-${dateIndex}`}
+                      className={`absolute cursor-pointer transition-colors ${
+                        isDropTarget ? 'bg-amber-100' : 'hover:bg-stone-100/50'
+                      }`}
+                      style={{
+                        left: dateIndex * DAY_WIDTH,
+                        top: roomIndex * ROOM_HEIGHT,
+                        width: DAY_WIDTH,
+                        height: ROOM_HEIGHT,
+                      }}
+                      onClick={() => !draggingBooking && openCreateBooking(room.id, dateStr)}
+                      onDragOver={(e) => handleDragOver(room.id, dateStr, e)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(room.id, dateStr, e)}
+                    />
+                  )
+                })
               ))}
 
               {/* Bookings */}
@@ -606,10 +736,15 @@ export default function BookingsPage() {
                   // Check if booking is within visible range
                   if (left + width < 0 || left > dates.length * DAY_WIDTH) return null
 
+                  const isDragging = draggingBooking?.id === booking.id
+
                   return (
                     <div
                       key={booking.id}
-                      className={`absolute rounded-lg border-2 ${colors.bg} ${colors.border} ${statusClass} cursor-pointer transition-all hover:shadow-lg hover:z-10`}
+                      draggable
+                      className={`absolute rounded-lg border-2 ${colors.bg} ${colors.border} ${statusClass} cursor-grab transition-all hover:shadow-lg hover:z-10 ${
+                        isDragging ? 'opacity-50 cursor-grabbing' : ''
+                      }`}
                       style={{
                         left: Math.max(0, left),
                         top: roomIndex * ROOM_HEIGHT + 4,
@@ -618,8 +753,10 @@ export default function BookingsPage() {
                       }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        openEditBooking(booking)
+                        if (!draggingBooking) openEditBooking(booking)
                       }}
+                      onDragStart={(e) => handleDragStart(booking, e)}
+                      onDragEnd={handleDragEnd}
                       onMouseEnter={(e) => handleBookingHover(booking, e)}
                       onMouseLeave={() => setHoveredBooking(null)}
                     >
@@ -771,6 +908,7 @@ export default function BookingsPage() {
                   onChange={(e) => setBookingForm({ ...bookingForm, source: e.target.value as Booking['source'] })}
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 >
+                  <option value="MANUAL">Manual</option>
                   <option value="WEBSITE">Website</option>
                   <option value="BOOKING_COM">Booking.com</option>
                   <option value="SZALLAS_HU">Szállás.hu</option>
@@ -877,14 +1015,42 @@ export default function BookingsPage() {
               {/* Total Amount */}
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">Total Amount (EUR)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={bookingForm.totalAmount}
-                  onChange={(e) => setBookingForm({ ...bookingForm, totalAmount: e.target.value })}
-                  placeholder="Optional"
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bookingForm.totalAmount}
+                    onChange={(e) => setBookingForm({ ...bookingForm, totalAmount: e.target.value })}
+                    placeholder="Enter or calculate"
+                    className="flex-1 px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={calculatePrice}
+                    disabled={calculatingPrice || !bookingForm.roomId || !bookingForm.checkIn || !bookingForm.checkOut}
+                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                  >
+                    {calculatingPrice ? 'Calculating...' : 'Calculate'}
+                  </button>
+                </div>
+                {priceBreakdown && (
+                  <div className="mt-2 p-3 bg-stone-50 rounded-lg text-sm">
+                    <div className="flex justify-between text-stone-600">
+                      <span>{priceBreakdown.nights} night{priceBreakdown.nights !== 1 ? 's' : ''} accommodation</span>
+                      <span>{priceBreakdown.accommodationTotal.toFixed(2)} EUR</span>
+                    </div>
+                    {priceBreakdown.additionalTotal > 0 && (
+                      <div className="flex justify-between text-stone-600">
+                        <span>Additional fees</span>
+                        <span>{priceBreakdown.additionalTotal.toFixed(2)} EUR</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-semibold text-stone-900 mt-1 pt-1 border-t border-stone-200">
+                      <span>Total</span>
+                      <span>{priceBreakdown.grandTotal.toFixed(2)} EUR</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Notes */}

@@ -1,309 +1,222 @@
-# Accommodation Booking Admin System – Project Brief
+# Accommodation Booking Admin System – Project Brief (Updated)
 
-## 1. Project Overview
+## 0. General Context
 
-This project is an **admin web application for managing accommodation bookings**,
-built **inside an existing Next.js project**.
+This project is an **admin system for managing accommodations**, connected to a **public-facing booking website**.
 
-The system handles:
-- accommodation structure (buildings, room types, rooms)
-- complex pricing logic
-- booking visualization and management
-- admin authentication and user management
+The public website:
+- Displays accommodation, room types, and rooms
+- Supports **3 languages**:
+  - English (EN)
+  - Hungarian (HU)
+  - German (DE)
+- Allows booking by **room type**
 
-The application is designed for **clarity, scalability, and long-term maintainability**.
+The admin interface:
+- Manages all content and bookings
+- Allows **booking by individual rooms**
+- Is available under `/admin`
+- Requires authentication
 
----
-
-## 2. Claude AI Role Definition
-
-You are acting as a **senior full-stack product engineer and architect**.
-
-Your responsibilities:
-- design a clean data model
-- define business logic and constraints
-- choose appropriate technologies where explicitly allowed
-- propose scalable UI/UX patterns
-- implement features step-by-step
-- respect all constraints described below
-
-Do NOT invent business rules.
-Do NOT ignore existing project constraints.
+Tech stack:
+- Existing **Next.js** project (App Router)
+- **TypeScript**
+- **Tailwind CSS**
+- Minimal, clean, light UI with soft shadows
+- Local-first database, later deployable on **Vercel**
+- Claude should choose the most suitable DB + ORM
+- Image uploads must be converted to **webp**
 
 ---
 
-## 3. Technical Constraints & Stack
+## 1. Multilingual Content (CRITICAL)
 
-### 3.1 Framework & Styling
-- The project is an **existing Next.js application**
-- Styling must use **Tailwind CSS**
-- Design style:
-    - minimalist
-    - clean
-    - light theme
-    - subtle shadows
-    - calm, modern color palette
-- Avoid heavy UI libraries unless clearly justified
+All **language-dependent content must be editable in EN / HU / DE**.
 
----
+A **global language selector** is required in the admin UI.
 
-### 3.2 Database Requirements
+Language-dependent fields include (but are not limited to):
 
-- The database must:
-    - run locally during development
-    - be deployable on **Vercel** later
-- Claude must **evaluate and select the most suitable solution**
-  (e.g. SQLite-based, serverless-compatible, or edge-friendly)
-- The choice must be justified briefly:
-    - why it fits local + Vercel environments
-    - how migrations and scaling are handled
+- Building description
+- Room Type name and description
+- Room description (if added later)
+- Additional Price titles
+- House Rules labels and values
+- Amenities names
+- Booking Conditions (Cancellation, Payment, Deposit)
+
+The data model must support structured multilingual storage.
 
 ---
 
-### 3.3 Authentication & Authorization
+## 2. Accommodation Structure
 
-- Admin authentication is required
-- Use a **users table** with:
-    - name
-    - email
-    - password (securely hashed)
-- Authentication scope:
-    - admin area only
-- Claude should:
-    - propose a secure and simple auth solution
-    - avoid overengineering
-
----
-
-### 3.4 Admin User Management
-
-- An admin UI must exist to manage users
-- Admins can:
-    - create users
-    - edit users
-    - delete users
-- User management fields:
-    - name
-    - email
-    - password
-
----
-
-### 3.5 Routing & Access
-
-- The entire admin interface must live under:
-    - `/admin` path
-- All admin routes must be protected by authentication
-- Public booking pages are outside the scope of this brief
-
----
-
-## 4. Core Hierarchy & Terminology
-
-The accommodation structure follows this strict hierarchy:
+### Hierarchy
 
 Building
 └─ Room Type
 └─ Room
 
 
-Key rules:
-- Bookings are displayed **on Room level**
-- Website bookings are made on **Room Type level**
-- Admin bookings are made on **Room level**
-- All pricing is defined on **Room Type level**
-- Availability is resolved down to **Room level**
+This hierarchy is used consistently across:
+- Admin UI
+- Booking timetable
+- Pricing
+- Availability
 
 ---
 
-## 5. Module 1 – Accommodation Administration
+## 3. Building Management
 
-### 5.1 Buildings
+### Editable fields
 
-Each Building supports the following editable fields:
-
-- Name
-- Address
-  - Either a textual address (for Google Maps geocoding)
-  - Or manual latitude & longitude
-- Description (rich text)
-- Images
-  - Order matters
-  - Automatically converted to WebP
-- House Rules
-  - N items
-  - key–value pairs (e.g. "Check-out" → "10:00")
-- Amenities
-  - Admin-defined categories
-  - Each category can contain N items
-- Booking Conditions
-  - Rich text field
-  - Logically separated sections:
-    - Cancellation Policy
-    - Payment Methods
-    - Deposit
-- Additional Prices
-  - N items
-  - Title
+- Name (multilingual)
+- Address OR latitude & longitude (Google Maps compatible)
+- Description (multilingual, rich text)
+- Images (ordered, upload → webp)
+- House Rules:
+  - N entries
+  - Two multilingual text fields (e.g. "Check-out" : "10:00")
+- Amenities:
+  - Admin-defined
+  - Grouped by category
+  - Multilingual
+- Booking Conditions (rich text, multilingual):
+  - Cancellation Policy
+  - Payment Methods
+  - Deposit
+- Additional Prices:
+  - N entries
+  - Multilingual title
   - Price (EUR)
-  - Mandatory or Optional (checkbox)
-  - Applied Per Night or Per Booking (radio)
+  - Mandatory / Optional (checkbox)
+  - Per night / Per booking (radio)
+
+Buildings can be:
+- Created
+- Edited
+- Duplicated (without images)
+- Deleted (with double confirmation if dependencies exist)
 
 ---
 
-### 5.2 Room Types
+## 4. Room Type Management
 
-Each Room Type belongs to a Building and contains:
+### Editable fields
 
-- Name
+- Name (multilingual)
+- Description (multilingual, rich text)
 - Capacity (number of adults)
-- Amenities (admin-defined categories)
-- Images (ordered, WebP)
-- Additional Prices
-  - Same structure as Building-level additional prices
+- Amenities (admin-defined, multilingual)
+- Images (ordered, upload → webp)
+- Additional Prices (same structure as Building-level)
+
+Room Types:
+- Belong to one Building
+- Can be duplicated (without images)
+- Can be deleted (double confirmation if rooms exist)
 
 ---
 
-### 5.3 Rooms
+## 5. Room Management
 
-Each Room belongs to a Room Type and contains:
+### Fields
 
 - Name
-- Active / Inactive flag
-  - Inactive rooms:
-    - visible in admin
-    - NOT bookable on the booking website
+- Belongs to one Room Type
+- Active / Inactive toggle
+
+Inactive rooms:
+- Are visible in admin UI (clearly marked)
+- Are NOT bookable on the public website
+
+Rooms can be:
+- Created
+- Edited
+- Duplicated
+- Deleted
 
 ---
 
-### 5.4 Admin UX Rules
+## 6. Pricing Module (`/admin/prices`)
 
-- "Add New" buttons exist for:
-  - Buildings
-  - Room Types
-- Creation and editing via forms or modals
-- Delete rules:
-  - Always require confirmation
-  - Double confirmation if child entities exist
-- Duplication:
-  - Room Types and Rooms can be duplicated
-  - All data copied EXCEPT images
+Prices are defined **per Room Type**.
 
----
+### 6.1 Date Range Pricing
 
-## 6. Module 2 – Pricing Management
+Admins can define prices by selecting a date range:
 
-### 6.1 Pricing Scope
-
-- Prices are defined **per Room Type**
-- Prices exist on a **per-day level**
-- Priority:
-  - single-day override
-  - date-range price
-  - no price
-
----
-
-### 6.2 Date Range Pricing
-
-Inputs:
-- Start date
-- End date
+- Start date – End date
 - Weekday price (Sun–Thu)
 - Weekend price (Fri–Sat)
 - Minimum nights
 
-Applies to all days unless overridden.
+Rules:
+- **Date ranges must NOT overlap**
+- The system must prevent saving overlapping ranges
 
 ---
 
-### 6.3 Calendar Overrides
+### 6.2 Calendar Pricing View
 
-- Single-day editing:
-  - price override
-  - minimum nights override (including 0)
-  - deactivate day
-- Inactive day:
-  - not bookable for any room of that room type
+- Calendar view per Room Type
+- Displays:
+  - Day number
+  - Price per night
+  - Minimum nights (icon)
+- Days without price → grey
+- Inactive days → red
 
----
+Actions:
+- Click a single day → edit price / min nights / inactive
+- Select multiple days (mobile-friendly selection) → bulk edit
 
-### 6.4 Bulk Editing
-
-- Multi-day selection
-- Works on mobile
-- Modal-based editing
-
----
-
-### 6.5 Calendar UI States
-
-- No price → grey
-- Inactive day → red
-- Shows:
-  - day number
-  - price per night
-  - minimum nights icon
-- Month navigation supported
+Inactive day:
+- Makes the day unbookable for all rooms of that Room Type
 
 ---
 
-## 7. Module 3 – Booking Management
+## 7. Booking Management Module (CORE)
 
-### 7.1 Booking Sources & Badges
+### Booking Sources
 
-- Website booking → yellow
-- Manual admin bookings:
-  - Booking.com → blue
-  - Szállás.hu → orange
-  - Airbnb → red
+Each booking has a **Source**, shown with badge + color:
 
----
-
-### 7.2 Timeline View
-
-- Horizontally scrollable infinite timeline
-- Fixed:
-  - top date row
-  - left room column
-- Bookings rendered on Room rows
+- Website → yellow
+- Manual → grey (default for admin-created bookings)
+- Booking.com → blue
+- Szállás.hu → orange
+- Airbnb → red
 
 ---
 
-### 7.3 Date Navigation
+### Booking Timeline UI
 
-- Date picker
-- Auto-scroll to selected date
+- Horizontal infinite scroll
+- Top row: dates (sticky)
+- Left column: rooms in hierarchy (sticky)
+- Scrollable content area
+- Date picker:
+  - Default selected date = **yesterday**
+  - Scroll range = ± selected interval (e.g. ±3 months)
 
----
+Bookings are shown as **rectangular blocks**:
 
-### 7.4 Booking Blocks
+- Half-day offset:
+  - Check-in: 14:00
+  - Check-out: 10:00
+- Block displays:
+  - Guest name
+  - Number of guests
+  - Note icon (if exists)
+  - Additional price icon (if selected)
 
-Block contents:
-- Guest name
-- Guest count
-- Icons:
-  - notes
-  - additional prices
+Block color:
+- Grey → website booking (unconfirmed)
+- Green → admin-confirmed
 
-Time logic:
-- Check-in: 14:00
-- Check-out: 10:00
-- Half-day rendering on first and last day
-
----
-
-### 7.5 Status Colors
-
-- Incoming (not confirmed) → grey
-- Confirmed → green
-
----
-
-### 7.6 Hover Popup
-
-Displays:
-- Guest info
+Hover popup shows:
+- Guest name & contact
 - Room name
 - Guest count
 - Notes
@@ -311,26 +224,64 @@ Displays:
 - Total amount
 - Booking status
 - Payment status
-
-CTA:
-- View booking details
+- Link to full booking details
 
 ---
 
-## 8. Execution Order for Claude AI
+### Drag & Drop Bookings
 
-You must proceed in this exact order:
+Bookings can be dragged:
+- To different dates (same room)
+- To a different room
 
-1. Analyze existing Next.js project structure
-2. Select and justify database solution
-3. Define core entities and relations
-4. Implement authentication & user management
-5. Build Module 1 – Accommodation Admin
-6. Build Module 2 – Pricing
-7. Build Module 3 – Booking Timeline
-8. Validate edge cases and constraints
+Rules:
+- Must fit availability
+- Must respect booking rules
+- Must not overlap other bookings
 
-Do not skip steps.
-Do not merge modules prematurely.
+If price changes:
+- Show warning modal
+- Require confirmation before applying changes
 
 ---
+
+## 8. New Booking Logic (Admin)
+
+- Default Source = Manual
+- When Source = Manual:
+  - Total Amount is calculated from pricing rules
+  - Recalculated on every relevant change
+  - Amount is editable
+- For other sources:
+  - Total Amount is read-only (disabled)
+
+---
+
+## 9. Image Handling
+
+- All images must be uploaded as files
+- URLs are NOT allowed
+- Uploaded images are converted to **webp**
+- Image order is preserved
+
+---
+
+## 10. Authentication & Users
+
+- Admin authentication required
+- Users table:
+  - Name
+  - Email
+  - Password
+- Admin UI to manage users
+
+---
+
+## 11. Admin UI Principles
+
+- Tailwind-based
+- Light, minimal, modern
+- Clear visual hierarchy
+- Soft shadows
+- Clear inactive / disabled states
+

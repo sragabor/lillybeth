@@ -2,6 +2,46 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 
+// Helper function to check for date range overlaps
+async function checkOverlap(
+  roomTypeId: string,
+  startDate: Date,
+  endDate: Date,
+  excludeId?: string
+): Promise<{ hasOverlap: boolean; overlappingRange?: { startDate: Date; endDate: Date } }> {
+  // Find any existing date ranges that overlap with the new range
+  // Two ranges overlap if: startA <= endB AND endA >= startB
+  const overlappingRanges = await prisma.dateRangePrice.findMany({
+    where: {
+      roomTypeId,
+      id: excludeId ? { not: excludeId } : undefined,
+      AND: [
+        { startDate: { lte: endDate } },
+        { endDate: { gte: startDate } },
+      ],
+    },
+    orderBy: { startDate: 'asc' },
+    take: 1,
+  })
+
+  if (overlappingRanges.length > 0) {
+    return {
+      hasOverlap: true,
+      overlappingRange: {
+        startDate: overlappingRanges[0].startDate,
+        endDate: overlappingRanges[0].endDate,
+      },
+    }
+  }
+
+  return { hasOverlap: false }
+}
+
+// Format date for error message
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0]
+}
+
 // GET all date range prices for a room type
 export async function GET(
   request: NextRequest,
@@ -53,6 +93,20 @@ export async function POST(
 
     if (endDate < startDate) {
       return NextResponse.json({ error: 'End date must be after start date' }, { status: 400 })
+    }
+
+    // Check for overlapping date ranges
+    const { hasOverlap, overlappingRange } = await checkOverlap(roomTypeId, startDate, endDate)
+
+    if (hasOverlap && overlappingRange) {
+      return NextResponse.json({
+        error: 'Date range overlap',
+        message: `This date range overlaps with an existing range (${formatDate(overlappingRange.startDate)} - ${formatDate(overlappingRange.endDate)}). Please adjust your dates.`,
+        overlappingRange: {
+          startDate: formatDate(overlappingRange.startDate),
+          endDate: formatDate(overlappingRange.endDate),
+        },
+      }, { status: 409 })
     }
 
     const dateRangePrice = await prisma.dateRangePrice.create({

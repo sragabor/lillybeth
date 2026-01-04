@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { LocalizedText } from '@/lib/i18n'
+import { Prisma } from '@/generated/prisma'
 
 interface PriceInput {
-  title: string
+  title: LocalizedText
   priceEur: number
   mandatory: boolean
   perNight: boolean
@@ -31,7 +33,7 @@ export async function POST(
       await prisma.buildingAdditionalPrice.createMany({
         data: prices.map((price, index) => ({
           buildingId,
-          title: price.title,
+          title: price.title as Prisma.InputJsonValue,
           priceEur: price.priceEur,
           mandatory: price.mandatory,
           perNight: price.perNight,
