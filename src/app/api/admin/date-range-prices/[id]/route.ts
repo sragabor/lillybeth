@@ -132,6 +132,7 @@ export async function PUT(
     if (data.weekdayPrice !== undefined) updateData.weekdayPrice = parseFloat(data.weekdayPrice)
     if (data.weekendPrice !== undefined) updateData.weekendPrice = parseFloat(data.weekendPrice)
     if (data.minNights !== undefined) updateData.minNights = parseInt(data.minNights)
+    if (data.isInactive !== undefined) updateData.isInactive = data.isInactive === true
 
     const dateRangePrice = await prisma.dateRangePrice.update({
       where: { id },

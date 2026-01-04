@@ -58,6 +58,8 @@ interface TimelineData {
   buildings: Building[]
   bookings: Booking[]
   bookingsByRoom: Record<string, Booking[]>
+  roomToRoomType: Record<string, string>
+  inactiveDaysByRoomType: Record<string, string[]>
 }
 
 // Constants
@@ -143,14 +145,44 @@ export default function BookingsPage() {
   const [priceBreakdown, setPriceBreakdown] = useState<{
     nights: number
     accommodationTotal: number
+    availableAdditionalPrices: {
+      id: string
+      title: string
+      priceEur: number
+      mandatory: boolean
+      perNight: boolean
+      origin: 'building' | 'roomType'
+    }[]
+    additionalPrices: {
+      id: string
+      title: string
+      priceEur: number
+      quantity: number
+      total: number
+      origin: 'building' | 'roomType'
+    }[]
     additionalTotal: number
     grandTotal: number
   } | null>(null)
+
+  // Selected optional additional price IDs
+  const [selectedPriceIds, setSelectedPriceIds] = useState<Set<string>>(new Set())
 
   // Drag and drop state
   const [draggingBooking, setDraggingBooking] = useState<Booking | null>(null)
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)
+
+  // Drag & drop price change warning
+  const [showDragWarningModal, setShowDragWarningModal] = useState(false)
+  const [pendingDrop, setPendingDrop] = useState<{
+    booking: Booking
+    roomId: string
+    newCheckIn: string
+    newCheckOut: string
+    oldPrice: number | null
+    newPrice: number | null
+  } | null>(null)
 
   const endDate = useCallback(() => {
     const end = new Date(startDate)
@@ -163,13 +195,21 @@ export default function BookingsPage() {
     try {
       const res = await fetch(`/api/admin/bookings/timeline?startDate=${startDate}&endDate=${endDate()}`)
       const data = await res.json()
+
+      // Check if API returned an error
+      if (!res.ok || data.error) {
+        console.error('Timeline API error:', data.error)
+        setTimelineData(null)
+        return
+      }
+
       setTimelineData(data)
 
       // Build available rooms list
       const rooms: { room: Room; building: string; roomType: string }[] = []
       data.buildings?.forEach((building: Building) => {
-        building.roomTypes.forEach((roomType) => {
-          roomType.rooms.forEach((room) => {
+        building.roomTypes?.forEach((roomType) => {
+          roomType.rooms?.forEach((room) => {
             rooms.push({
               room,
               building: building.name,
@@ -181,6 +221,7 @@ export default function BookingsPage() {
       setAvailableRooms(rooms)
     } catch (error) {
       console.error('Error fetching timeline:', error)
+      setTimelineData(null)
     } finally {
       setLoading(false)
     }
@@ -239,11 +280,13 @@ export default function BookingsPage() {
   }
 
   // Calculate price for booking
-  const calculatePrice = async () => {
+  const calculatePrice = async (priceIds?: Set<string>) => {
     if (!bookingForm.roomId || !bookingForm.checkIn || !bookingForm.checkOut) {
       alert('Please select a room and dates first')
       return
     }
+
+    const idsToUse = priceIds ?? selectedPriceIds
 
     setCalculatingPrice(true)
     try {
@@ -254,16 +297,17 @@ export default function BookingsPage() {
           roomId: bookingForm.roomId,
           checkIn: bookingForm.checkIn,
           checkOut: bookingForm.checkOut,
+          selectedPriceIds: Array.from(idsToUse),
         }),
       })
 
       if (res.ok) {
         const data = await res.json()
         setPriceBreakdown(data.breakdown)
-        setBookingForm({
-          ...bookingForm,
+        setBookingForm((prev) => ({
+          ...prev,
           totalAmount: data.breakdown.grandTotal.toString(),
-        })
+        }))
       } else {
         const error = await res.json()
         alert(error.error || 'Failed to calculate price')
@@ -275,10 +319,26 @@ export default function BookingsPage() {
     }
   }
 
+  // Toggle optional additional price selection
+  const toggleAdditionalPrice = (priceId: string) => {
+    const newSelection = new Set(selectedPriceIds)
+    if (newSelection.has(priceId)) {
+      newSelection.delete(priceId)
+    } else {
+      newSelection.add(priceId)
+    }
+    setSelectedPriceIds(newSelection)
+    // Auto-recalculate when selection changes
+    if (bookingForm.roomId && bookingForm.checkIn && bookingForm.checkOut) {
+      calculatePrice(newSelection)
+    }
+  }
+
   // Open booking modal
   const openCreateBooking = (roomId?: string, date?: string) => {
     setEditingBooking(null)
     setPriceBreakdown(null)
+    setSelectedPriceIds(new Set())
     setBookingForm({
       roomId: roomId || '',
       source: 'MANUAL',
@@ -299,6 +359,9 @@ export default function BookingsPage() {
   const openEditBooking = (booking: Booking) => {
     setEditingBooking(booking)
     setPriceBreakdown(null)
+    // Extract selected optional price IDs from existing booking
+    const existingPriceIds = new Set(booking.additionalPrices.map(p => p.id))
+    setSelectedPriceIds(existingPriceIds)
     setBookingForm({
       roomId: booking.roomId,
       source: booking.source,
@@ -317,8 +380,29 @@ export default function BookingsPage() {
     setHoveredBooking(null)
   }
 
+  // Validate booking form
+  const validateBookingForm = (): string | null => {
+    if (!bookingForm.roomId) return 'Please select a room'
+    if (!bookingForm.guestName.trim()) return 'Guest name is required'
+    if (!bookingForm.guestEmail.trim()) return 'Email is required'
+    if (!bookingForm.guestPhone.trim()) return 'Phone is required'
+    if (!bookingForm.guestCount || parseInt(bookingForm.guestCount) < 1) return 'Number of guests must be at least 1'
+    if (!bookingForm.checkIn) return 'Check-in date is required'
+    if (!bookingForm.checkOut) return 'Check-out date is required'
+    if (new Date(bookingForm.checkOut) <= new Date(bookingForm.checkIn)) {
+      return 'Check-out date must be after check-in date'
+    }
+    return null
+  }
+
   // Save booking
   const handleSaveBooking = async () => {
+    const validationError = validateBookingForm()
+    if (validationError) {
+      alert(validationError)
+      return
+    }
+
     try {
       const url = editingBooking
         ? `/api/admin/bookings/${editingBooking.id}`
@@ -408,15 +492,68 @@ export default function BookingsPage() {
     const newCheckOut = new Date(date)
     newCheckOut.setDate(newCheckOut.getDate() + nights)
 
+    const newCheckInStr = newCheckIn.toISOString().split('T')[0]
+    const newCheckOutStr = newCheckOut.toISOString().split('T')[0]
+
+    // Check if price would change
     try {
-      const res = await fetch(`/api/admin/bookings/${draggingBooking.id}`, {
-        method: 'PUT',
+      const res = await fetch('/api/admin/bookings/calculate-price', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomId,
-          checkIn: newCheckIn.toISOString().split('T')[0],
-          checkOut: newCheckOut.toISOString().split('T')[0],
+          checkIn: newCheckInStr,
+          checkOut: newCheckOutStr,
         }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        const newPrice = data.breakdown.grandTotal
+        const oldPrice = draggingBooking.totalAmount
+
+        // If price changed, show warning modal
+        if (oldPrice !== null && Math.abs(newPrice - oldPrice) > 0.01) {
+          setPendingDrop({
+            booking: draggingBooking,
+            roomId,
+            newCheckIn: newCheckInStr,
+            newCheckOut: newCheckOutStr,
+            oldPrice,
+            newPrice,
+          })
+          setShowDragWarningModal(true)
+          setDraggingBooking(null)
+          setDragOverRoom(null)
+          setDragOverDate(null)
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error checking new price:', error)
+    }
+
+    // No price change or couldn't check - proceed with move
+    await executeDrop(draggingBooking.id, roomId, newCheckInStr, newCheckOutStr)
+  }
+
+  const executeDrop = async (bookingId: string, roomId: string, checkIn: string, checkOut: string, newPrice?: number) => {
+    try {
+      const updateData: Record<string, unknown> = {
+        roomId,
+        checkIn,
+        checkOut,
+      }
+
+      // Optionally update price
+      if (newPrice !== undefined) {
+        updateData.totalAmount = newPrice.toString()
+      }
+
+      const res = await fetch(`/api/admin/bookings/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
       })
 
       if (res.ok) {
@@ -431,16 +568,34 @@ export default function BookingsPage() {
       setDraggingBooking(null)
       setDragOverRoom(null)
       setDragOverDate(null)
+      setPendingDrop(null)
+      setShowDragWarningModal(false)
     }
+  }
+
+  const handleConfirmDrop = (updatePrice: boolean) => {
+    if (!pendingDrop) return
+    executeDrop(
+      pendingDrop.booking.id,
+      pendingDrop.roomId,
+      pendingDrop.newCheckIn,
+      pendingDrop.newCheckOut,
+      updatePrice ? pendingDrop.newPrice ?? undefined : undefined
+    )
+  }
+
+  const handleCancelDrop = () => {
+    setPendingDrop(null)
+    setShowDragWarningModal(false)
   }
 
   // Get all rooms flattened
   const getAllRooms = () => {
-    if (!timelineData) return []
+    if (!timelineData?.buildings) return []
     const rooms: { room: Room; buildingName: string; roomTypeName: string }[] = []
     timelineData.buildings.forEach((building) => {
-      building.roomTypes.forEach((roomType) => {
-        roomType.rooms.forEach((room) => {
+      building.roomTypes?.forEach((roomType) => {
+        roomType.rooms?.forEach((room) => {
           rooms.push({
             room,
             buildingName: building.name,
@@ -454,10 +609,35 @@ export default function BookingsPage() {
 
   const allRooms = getAllRooms()
 
+  // Check if a specific date is inactive for a room
+  const isDayInactive = (roomId: string, dateStr: string): boolean => {
+    if (!timelineData) return false
+    const roomTypeId = timelineData.roomToRoomType[roomId]
+    if (!roomTypeId) return false
+    const inactiveDays = timelineData.inactiveDaysByRoomType[roomTypeId]
+    return inactiveDays?.includes(dateStr) || false
+  }
+
   if (loading && !timelineData) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800" />
+        <p className="text-sm text-stone-500">Loading timeline...</p>
+      </div>
+    )
+  }
+
+  // Handle case where loading is complete but no data (API error)
+  if (!loading && !timelineData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-red-500">Failed to load timeline data. Please try again.</p>
+        <button
+          onClick={() => fetchTimelineData()}
+          className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 cursor-pointer"
+        >
+          Retry
+        </button>
       </div>
     )
   }
@@ -466,13 +646,18 @@ export default function BookingsPage() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-stone-900">Booking Timeline</h1>
-          <p className="text-stone-600 mt-1">View and manage all bookings</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-stone-900">Booking Timeline</h1>
+            <p className="text-stone-600 mt-1">View and manage all bookings</p>
+          </div>
+          {loading && timelineData && (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-500" title="Refreshing..." />
+          )}
         </div>
         <button
           onClick={() => openCreateBooking()}
-          className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+          className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
         >
           Add Booking
         </button>
@@ -484,7 +669,7 @@ export default function BookingsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigateDays(-7)}
-              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               title="Previous week"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -493,7 +678,7 @@ export default function BookingsPage() {
             </button>
             <button
               onClick={() => navigateDays(-1)}
-              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               title="Previous day"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -502,13 +687,13 @@ export default function BookingsPage() {
             </button>
             <button
               onClick={goToToday}
-              className="px-3 py-1 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+              className="px-3 py-1 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
             >
               Today
             </button>
             <button
               onClick={() => navigateDays(1)}
-              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               title="Next day"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -517,7 +702,7 @@ export default function BookingsPage() {
             </button>
             <button
               onClick={() => navigateDays(7)}
-              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               title="Next week"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -530,13 +715,13 @@ export default function BookingsPage() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            className="px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
           />
 
           <select
             value={daysToShow}
             onChange={(e) => setDaysToShow(parseInt(e.target.value))}
-            className="px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            className="px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
           >
             <option value={14}>2 weeks</option>
             <option value={30}>1 month</option>
@@ -545,13 +730,17 @@ export default function BookingsPage() {
           </select>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 ml-auto text-sm">
+          <div className="flex items-center gap-4 ml-auto text-sm flex-wrap">
             {Object.entries(SOURCE_COLORS).map(([source, colors]) => (
               <div key={source} className="flex items-center gap-1">
                 <div className={`w-3 h-3 rounded ${colors.badge}`} />
                 <span className="text-stone-600">{SOURCE_LABELS[source as keyof typeof SOURCE_LABELS]}</span>
               </div>
             ))}
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-red-200 border border-red-300" />
+              <span className="text-stone-600">Inactive</span>
+            </div>
           </div>
         </div>
       </div>
@@ -630,17 +819,24 @@ export default function BookingsPage() {
               <div
                 key={room.id}
                 className={`border-b border-stone-100 px-3 flex items-center ${
-                  !room.isActive ? 'bg-stone-50' : ''
+                  !room.isActive ? 'bg-stone-100' : ''
                 }`}
                 style={{ height: ROOM_HEIGHT }}
               >
-                <div className="min-w-0">
-                  <p className={`text-sm font-medium truncate ${!room.isActive ? 'text-stone-400' : 'text-stone-900'}`}>
-                    {room.name}
-                  </p>
-                  <p className="text-xs text-stone-500 truncate">
-                    {buildingName} / {roomTypeName}
-                  </p>
+                <div className="min-w-0 flex items-center gap-2">
+                  <div>
+                    <p className={`text-sm font-medium truncate ${!room.isActive ? 'text-stone-400' : 'text-stone-900'}`}>
+                      {room.name}
+                    </p>
+                    <p className="text-xs text-stone-500 truncate">
+                      {buildingName} / {roomTypeName}
+                    </p>
+                  </div>
+                  {!room.isActive && (
+                    <span className="flex-shrink-0 text-xs px-1.5 py-0.5 bg-stone-200 text-stone-500 rounded">
+                      Inactive
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -704,11 +900,21 @@ export default function BookingsPage() {
                 dates.map((date, dateIndex) => {
                   const dateStr = date.toISOString().split('T')[0]
                   const isDropTarget = dragOverRoom === room.id && dragOverDate === dateStr
+                  const isRoomInactive = !room.isActive
+                  const isDateInactive = isDayInactive(room.id, dateStr)
+                  const isDisabled = isRoomInactive || isDateInactive
+
                   return (
                     <div
                       key={`click-${room.id}-${dateIndex}`}
-                      className={`absolute cursor-pointer transition-colors ${
-                        isDropTarget ? 'bg-amber-100' : 'hover:bg-stone-100/50'
+                      className={`absolute transition-colors ${
+                        isDateInactive
+                          ? 'bg-red-100/80 cursor-not-allowed'
+                          : isRoomInactive
+                            ? 'bg-stone-100/80 cursor-not-allowed'
+                            : isDropTarget
+                              ? 'bg-amber-100 cursor-pointer'
+                              : 'hover:bg-stone-100/50 cursor-pointer'
                       }`}
                       style={{
                         left: dateIndex * DAY_WIDTH,
@@ -716,10 +922,11 @@ export default function BookingsPage() {
                         width: DAY_WIDTH,
                         height: ROOM_HEIGHT,
                       }}
-                      onClick={() => !draggingBooking && openCreateBooking(room.id, dateStr)}
-                      onDragOver={(e) => handleDragOver(room.id, dateStr, e)}
+                      onClick={() => !draggingBooking && !isDisabled && openCreateBooking(room.id, dateStr)}
+                      onDragOver={(e) => !isDisabled && handleDragOver(room.id, dateStr, e)}
                       onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(room.id, dateStr, e)}
+                      onDrop={(e) => !isDisabled && handleDrop(room.id, dateStr, e)}
+                      title={isDateInactive ? 'This day is marked as inactive' : isRoomInactive ? 'This room is inactive' : undefined}
                     />
                   )
                 })
@@ -885,14 +1092,17 @@ export default function BookingsPage() {
             <div className="space-y-4">
               {/* Room Selection */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Room</label>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Room <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={bookingForm.roomId}
                   onChange={(e) => setBookingForm({ ...bookingForm, roomId: e.target.value })}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  required
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
                 >
                   <option value="">Select a room</option>
-                  {availableRooms.map(({ room, building, roomType }) => (
+                  {availableRooms.filter(({ room }) => room.isActive).map(({ room, building, roomType }) => (
                     <option key={room.id} value={room.id}>
                       {building} / {roomType} / {room.name}
                     </option>
@@ -902,11 +1112,14 @@ export default function BookingsPage() {
 
               {/* Source */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Source</label>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Source <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={bookingForm.source}
                   onChange={(e) => setBookingForm({ ...bookingForm, source: e.target.value as Booking['source'] })}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  required
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
                 >
                   <option value="MANUAL">Manual</option>
                   <option value="WEBSITE">Website</option>
@@ -918,11 +1131,14 @@ export default function BookingsPage() {
 
               {/* Guest Name */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Guest Name</label>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Guest Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={bookingForm.guestName}
                   onChange={(e) => setBookingForm({ ...bookingForm, guestName: e.target.value })}
+                  required
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
               </div>
@@ -930,20 +1146,26 @@ export default function BookingsPage() {
               {/* Guest Contact */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">
+                    Email <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="email"
                     value={bookingForm.guestEmail}
                     onChange={(e) => setBookingForm({ ...bookingForm, guestEmail: e.target.value })}
+                    required
                     className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">
+                    Phone <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="tel"
                     value={bookingForm.guestPhone}
                     onChange={(e) => setBookingForm({ ...bookingForm, guestPhone: e.target.value })}
+                    required
                     className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
                 </div>
@@ -951,12 +1173,15 @@ export default function BookingsPage() {
 
               {/* Guest Count */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Number of Guests</label>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Number of Guests <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="number"
                   min="1"
                   value={bookingForm.guestCount}
                   onChange={(e) => setBookingForm({ ...bookingForm, guestCount: e.target.value })}
+                  required
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
               </div>
@@ -964,21 +1189,27 @@ export default function BookingsPage() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Check-in</label>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">
+                    Check-in <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     value={bookingForm.checkIn}
                     onChange={(e) => setBookingForm({ ...bookingForm, checkIn: e.target.value })}
-                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    required
+                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Check-out</label>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">
+                    Check-out <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     value={bookingForm.checkOut}
                     onChange={(e) => setBookingForm({ ...bookingForm, checkOut: e.target.value })}
-                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    required
+                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
                   />
                 </div>
               </div>
@@ -1012,45 +1243,168 @@ export default function BookingsPage() {
                 </div>
               </div>
 
-              {/* Total Amount */}
+              {/* Price Calculation */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Total Amount (EUR)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={bookingForm.totalAmount}
-                    onChange={(e) => setBookingForm({ ...bookingForm, totalAmount: e.target.value })}
-                    placeholder="Enter or calculate"
-                    className="flex-1 px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-stone-700">
+                    Price Calculation <span className="text-red-500">*</span>
+                  </label>
                   <button
                     type="button"
-                    onClick={calculatePrice}
+                    onClick={() => calculatePrice()}
                     disabled={calculatingPrice || !bookingForm.roomId || !bookingForm.checkIn || !bookingForm.checkOut}
-                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                    className="px-3 py-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm cursor-pointer"
                   >
-                    {calculatingPrice ? 'Calculating...' : 'Calculate'}
+                    {calculatingPrice ? 'Calculating...' : 'Calculate Price'}
                   </button>
                 </div>
+
                 {priceBreakdown && (
-                  <div className="mt-2 p-3 bg-stone-50 rounded-lg text-sm">
-                    <div className="flex justify-between text-stone-600">
-                      <span>{priceBreakdown.nights} night{priceBreakdown.nights !== 1 ? 's' : ''} accommodation</span>
-                      <span>{priceBreakdown.accommodationTotal.toFixed(2)} EUR</span>
+                  <div className="p-4 bg-stone-50 rounded-lg space-y-3">
+                    {/* Accommodation */}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-stone-600">
+                        {priceBreakdown.nights} night{priceBreakdown.nights !== 1 ? 's' : ''} accommodation
+                      </span>
+                      <span className="font-medium text-stone-800">{priceBreakdown.accommodationTotal.toFixed(2)} EUR</span>
                     </div>
-                    {priceBreakdown.additionalTotal > 0 && (
-                      <div className="flex justify-between text-stone-600">
-                        <span>Additional fees</span>
-                        <span>{priceBreakdown.additionalTotal.toFixed(2)} EUR</span>
+
+                    {/* Additional Prices Checkboxes */}
+                    {priceBreakdown.availableAdditionalPrices.length > 0 && (
+                      <div className="border-t border-stone-200 pt-3">
+                        <p className="text-sm font-medium text-stone-700 mb-2">Additional Prices</p>
+
+                        {/* Building-level prices */}
+                        {priceBreakdown.availableAdditionalPrices.some(p => p.origin === 'building') && (
+                          <div className="mb-2">
+                            <p className="text-xs text-stone-500 mb-1">Building</p>
+                            <div className="space-y-1">
+                              {priceBreakdown.availableAdditionalPrices
+                                .filter(p => p.origin === 'building')
+                                .map(price => (
+                                  <label
+                                    key={price.id}
+                                    className={`flex items-center justify-between p-2 rounded ${
+                                      price.mandatory ? 'bg-amber-50' : 'hover:bg-stone-100'
+                                    } cursor-pointer`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={price.mandatory || selectedPriceIds.has(price.id)}
+                                        disabled={price.mandatory}
+                                        onChange={() => !price.mandatory && toggleAdditionalPrice(price.id)}
+                                        className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer disabled:cursor-not-allowed"
+                                      />
+                                      <span className="text-sm text-stone-700">
+                                        {price.title}
+                                        {price.mandatory && (
+                                          <span className="ml-1 text-xs text-amber-600">(Required)</span>
+                                        )}
+                                        {price.perNight && (
+                                          <span className="ml-1 text-xs text-stone-500">/night</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    <span className="text-sm font-medium text-stone-700">
+                                      {price.priceEur.toFixed(2)} EUR
+                                    </span>
+                                  </label>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Room Type-level prices */}
+                        {priceBreakdown.availableAdditionalPrices.some(p => p.origin === 'roomType') && (
+                          <div>
+                            <p className="text-xs text-stone-500 mb-1">Room Type</p>
+                            <div className="space-y-1">
+                              {priceBreakdown.availableAdditionalPrices
+                                .filter(p => p.origin === 'roomType')
+                                .map(price => (
+                                  <label
+                                    key={price.id}
+                                    className={`flex items-center justify-between p-2 rounded ${
+                                      price.mandatory ? 'bg-amber-50' : 'hover:bg-stone-100'
+                                    } cursor-pointer`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={price.mandatory || selectedPriceIds.has(price.id)}
+                                        disabled={price.mandatory}
+                                        onChange={() => !price.mandatory && toggleAdditionalPrice(price.id)}
+                                        className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer disabled:cursor-not-allowed"
+                                      />
+                                      <span className="text-sm text-stone-700">
+                                        {price.title}
+                                        {price.mandatory && (
+                                          <span className="ml-1 text-xs text-amber-600">(Required)</span>
+                                        )}
+                                        {price.perNight && (
+                                          <span className="ml-1 text-xs text-stone-500">/night</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    <span className="text-sm font-medium text-stone-700">
+                                      {price.priceEur.toFixed(2)} EUR
+                                    </span>
+                                  </label>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div className="flex justify-between font-semibold text-stone-900 mt-1 pt-1 border-t border-stone-200">
+
+                    {/* Selected Additional Prices Summary */}
+                    {priceBreakdown.additionalPrices.length > 0 && (
+                      <div className="border-t border-stone-200 pt-2">
+                        {priceBreakdown.additionalPrices.map(price => (
+                          <div key={price.id} className="flex justify-between text-sm text-stone-600">
+                            <span>
+                              {price.title}
+                              {price.quantity > 1 && ` x${price.quantity}`}
+                            </span>
+                            <span>{price.total.toFixed(2)} EUR</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Grand Total */}
+                    <div className="flex justify-between font-semibold text-stone-900 pt-2 border-t border-stone-300">
                       <span>Total</span>
                       <span>{priceBreakdown.grandTotal.toFixed(2)} EUR</span>
                     </div>
                   </div>
                 )}
+
+                {!priceBreakdown && (
+                  <p className="text-sm text-stone-500 italic">
+                    Select room and dates, then click "Calculate Price"
+                  </p>
+                )}
+              </div>
+
+              {/* Total Amount (Manual Override) */}
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Total Amount (EUR) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={bookingForm.totalAmount}
+                  onChange={(e) => setBookingForm({ ...bookingForm, totalAmount: e.target.value })}
+                  placeholder="Calculated or enter manually"
+                  required
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-stone-500">
+                  Auto-filled from calculation. You can override if needed.
+                </p>
               </div>
 
               {/* Notes */}
@@ -1069,7 +1423,7 @@ export default function BookingsPage() {
               {editingBooking ? (
                 <button
                   onClick={handleDeleteBooking}
-                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                 >
                   Delete
                 </button>
@@ -1079,17 +1433,90 @@ export default function BookingsPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowBookingModal(false)}
-                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveBooking}
-                  className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                  className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
                 >
                   {editingBooking ? 'Update' : 'Create'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drag & Drop Price Warning Modal */}
+      {showDragWarningModal && pendingDrop && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-stone-900">Price Change Detected</h3>
+            </div>
+
+            <p className="text-stone-600 mb-4">
+              Moving this booking to the new dates will change the calculated price.
+            </p>
+
+            <div className="bg-stone-50 rounded-lg p-4 mb-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-stone-600">Guest:</span>
+                <span className="font-medium text-stone-800">{pendingDrop.booking.guestName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-stone-600">New dates:</span>
+                <span className="font-medium text-stone-800">
+                  {new Date(pendingDrop.newCheckIn).toLocaleDateString()} - {new Date(pendingDrop.newCheckOut).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="border-t border-stone-200 pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-stone-600">Current price:</span>
+                  <span className="font-medium text-stone-800">{pendingDrop.oldPrice?.toFixed(2)} EUR</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-stone-600">New price:</span>
+                  <span className={`font-medium ${pendingDrop.newPrice! > pendingDrop.oldPrice! ? 'text-green-600' : 'text-red-600'}`}>
+                    {pendingDrop.newPrice?.toFixed(2)} EUR
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm font-medium mt-1">
+                  <span className="text-stone-700">Difference:</span>
+                  <span className={pendingDrop.newPrice! > pendingDrop.oldPrice! ? 'text-green-600' : 'text-red-600'}>
+                    {pendingDrop.newPrice! > pendingDrop.oldPrice! ? '+' : ''}
+                    {(pendingDrop.newPrice! - pendingDrop.oldPrice!).toFixed(2)} EUR
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleConfirmDrop(true)}
+                className="w-full px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors cursor-pointer"
+              >
+                Move & Update Price to {pendingDrop.newPrice?.toFixed(2)} EUR
+              </button>
+              <button
+                onClick={() => handleConfirmDrop(false)}
+                className="w-full px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
+              >
+                Move & Keep Original Price ({pendingDrop.oldPrice?.toFixed(2)} EUR)
+              </button>
+              <button
+                onClick={handleCancelDrop}
+                className="w-full px-4 py-2 text-stone-600 hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

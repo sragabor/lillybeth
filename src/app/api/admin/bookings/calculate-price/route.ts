@@ -2,11 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 
+interface AdditionalPriceOption {
+  id: string
+  title: string
+  priceEur: number
+  mandatory: boolean
+  perNight: boolean
+  origin: 'building' | 'roomType'
+}
+
+interface SelectedAdditionalPrice {
+  id: string
+  title: string
+  priceEur: number
+  quantity: number
+  total: number
+  origin: 'building' | 'roomType'
+}
+
 interface PriceBreakdown {
   nights: number
   nightlyPrices: { date: string; price: number; source: string }[]
   accommodationTotal: number
-  additionalPrices: { title: string; priceEur: number; quantity: number; total: number }[]
+  availableAdditionalPrices: AdditionalPriceOption[]
+  additionalPrices: SelectedAdditionalPrice[]
   additionalTotal: number
   grandTotal: number
 }
@@ -37,13 +56,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Check-out must be after check-in' }, { status: 400 })
     }
 
-    // Get room with room type
+    // Selected optional price IDs from the request
+    const selectedPriceIds: string[] = data.selectedPriceIds || []
+
+    // Get room with room type and building
     const room = await prisma.room.findUnique({
       where: { id: data.roomId },
       include: {
         roomType: {
           include: {
             additionalPrices: { orderBy: { order: 'asc' } },
+            building: {
+              include: {
+                additionalPrices: { orderBy: { order: 'asc' } },
+              },
+            },
           },
         },
       },
@@ -54,6 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     const roomTypeId = room.roomTypeId
+    const building = room.roomType.building
 
     // Get date range prices for the period
     const dateRangePrices = await prisma.dateRangePrice.findMany({
@@ -120,22 +148,54 @@ export async function POST(request: NextRequest) {
 
     const accommodationTotal = nightlyPrices.reduce((sum, night) => sum + night.price, 0)
 
-    // Calculate additional prices (mandatory ones by default)
-    const additionalPrices: { title: string; priceEur: number; quantity: number; total: number }[] = []
+    // Build list of all available additional prices
+    const availableAdditionalPrices: AdditionalPriceOption[] = []
+
+    // Add building-level additional prices
+    for (const price of building.additionalPrices) {
+      const titleObj = price.title as Record<string, string>
+      const title = titleObj?.en || titleObj?.hu || 'Additional fee'
+      availableAdditionalPrices.push({
+        id: price.id,
+        title,
+        priceEur: price.priceEur,
+        mandatory: price.mandatory,
+        perNight: price.perNight,
+        origin: 'building',
+      })
+    }
+
+    // Add room type-level additional prices
+    for (const price of room.roomType.additionalPrices) {
+      const titleObj = price.title as Record<string, string>
+      const title = titleObj?.en || titleObj?.hu || 'Additional fee'
+      availableAdditionalPrices.push({
+        id: price.id,
+        title,
+        priceEur: price.priceEur,
+        mandatory: price.mandatory,
+        perNight: price.perNight,
+        origin: 'roomType',
+      })
+    }
+
+    // Calculate selected additional prices (mandatory + selected optional)
+    const additionalPrices: SelectedAdditionalPrice[] = []
     let additionalTotal = 0
 
-    for (const price of room.roomType.additionalPrices) {
-      if (price.mandatory) {
-        const titleObj = price.title as Record<string, string>
-        const title = titleObj?.en || titleObj?.hu || 'Additional fee'
-        const quantity = price.perNight ? nights : 1
-        const total = price.priceEur * quantity
+    for (const priceOption of availableAdditionalPrices) {
+      // Include if mandatory OR if selected
+      if (priceOption.mandatory || selectedPriceIds.includes(priceOption.id)) {
+        const quantity = priceOption.perNight ? nights : 1
+        const total = priceOption.priceEur * quantity
 
         additionalPrices.push({
-          title,
-          priceEur: price.priceEur,
+          id: priceOption.id,
+          title: priceOption.title,
+          priceEur: priceOption.priceEur,
           quantity,
           total,
+          origin: priceOption.origin,
         })
         additionalTotal += total
       }
@@ -145,6 +205,7 @@ export async function POST(request: NextRequest) {
       nights,
       nightlyPrices,
       accommodationTotal,
+      availableAdditionalPrices,
       additionalPrices,
       additionalTotal,
       grandTotal: accommodationTotal + additionalTotal,

@@ -5,7 +5,8 @@
       "Bash(npx prisma:*)",
       "Bash(npm run build:*)",
       "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes reset the database\" npx prisma migrate reset:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(curl:*)"
     ]
   }
 }

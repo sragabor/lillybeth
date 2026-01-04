@@ -19,6 +19,7 @@ interface DateRangePrice {
   weekdayPrice: number
   weekendPrice: number
   minNights: number
+  isInactive: boolean
   roomTypeId: string
 }
 
@@ -76,6 +77,7 @@ export default function PricingPage() {
     weekdayPrice: '',
     weekendPrice: '',
     minNights: '1',
+    isInactive: false,
   })
 
   const [dayForm, setDayForm] = useState({
@@ -172,7 +174,7 @@ export default function PricingPage() {
 
       if (res.ok) {
         setShowDateRangeModal(false)
-        setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1' })
+        setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1', isInactive: false })
         fetchPricingData()
       } else {
         const data = await res.json()
@@ -203,7 +205,7 @@ export default function PricingPage() {
       if (res.ok) {
         setShowDateRangeModal(false)
         setEditingDateRange(null)
-        setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1' })
+        setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1', isInactive: false })
         fetchPricingData()
       } else {
         const data = await res.json()
@@ -245,6 +247,7 @@ export default function PricingPage() {
       weekdayPrice: dateRange.weekdayPrice.toString(),
       weekendPrice: dateRange.weekendPrice.toString(),
       minNights: dateRange.minNights.toString(),
+      isInactive: dateRange.isInactive || false,
     })
     setShowDateRangeModal(true)
   }
@@ -415,8 +418,9 @@ export default function PricingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800" />
+        <p className="text-sm text-stone-500">Loading pricing data...</p>
       </div>
     )
   }
@@ -458,7 +462,7 @@ export default function PricingPage() {
         <select
           value={selectedRoomTypeId}
           onChange={(e) => setSelectedRoomTypeId(e.target.value)}
-          className="w-full md:w-96 px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          className="w-full md:w-96 px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
         >
           {Object.entries(groupedRoomTypes).map(([buildingName, types]) => (
             <optgroup key={buildingName} label={buildingName}>
@@ -470,6 +474,19 @@ export default function PricingPage() {
             </optgroup>
           ))}
         </select>
+
+        {/* Current Selection Context */}
+        {selectedRoomTypeId && (() => {
+          const selectedRoomType = roomTypes.find(rt => rt.id === selectedRoomTypeId)
+          return selectedRoomType ? (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <span className="text-stone-500">Editing prices for:</span>
+              <span className="font-medium text-stone-800">
+                {selectedRoomType.building.name} → {selectedRoomType.name}
+              </span>
+            </div>
+          ) : null
+        })()}
       </div>
 
       {/* Date Range Prices Section */}
@@ -480,10 +497,10 @@ export default function PricingPage() {
             onClick={() => {
               setEditingDateRange(null)
               setDateRangeError(null)
-              setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1' })
+              setDateRangeForm({ startDate: '', endDate: '', weekdayPrice: '', weekendPrice: '', minNights: '1', isInactive: false })
               setShowDateRangeModal(true)
             }}
-            className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors text-sm"
+            className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors text-sm cursor-pointer"
           >
             Add Date Range
           </button>
@@ -495,6 +512,7 @@ export default function PricingPage() {
               <thead>
                 <tr className="text-left text-sm text-stone-600 border-b border-stone-200">
                   <th className="pb-3 font-medium">Date Range</th>
+                  <th className="pb-3 font-medium">Status</th>
                   <th className="pb-3 font-medium">Weekday Price</th>
                   <th className="pb-3 font-medium">Weekend Price</th>
                   <th className="pb-3 font-medium">Min Nights</th>
@@ -503,23 +521,40 @@ export default function PricingPage() {
               </thead>
               <tbody>
                 {pricingData.dateRangePrices.map((range) => (
-                  <tr key={range.id} className="border-b border-stone-100 last:border-0">
+                  <tr key={range.id} className={`border-b border-stone-100 last:border-0 ${range.isInactive ? 'bg-red-50' : ''}`}>
                     <td className="py-3">
                       {new Date(range.startDate).toLocaleDateString()} - {new Date(range.endDate).toLocaleDateString()}
                     </td>
-                    <td className="py-3">{range.weekdayPrice} EUR</td>
-                    <td className="py-3">{range.weekendPrice} EUR</td>
-                    <td className="py-3">{range.minNights}</td>
+                    <td className="py-3">
+                      {range.isInactive ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          Inactive
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          Active
+                        </span>
+                      )}
+                    </td>
+                    <td className={`py-3 ${range.isInactive ? 'text-stone-400' : ''}`}>
+                      {range.isInactive ? '—' : `${range.weekdayPrice} EUR`}
+                    </td>
+                    <td className={`py-3 ${range.isInactive ? 'text-stone-400' : ''}`}>
+                      {range.isInactive ? '—' : `${range.weekendPrice} EUR`}
+                    </td>
+                    <td className={`py-3 ${range.isInactive ? 'text-stone-400' : ''}`}>
+                      {range.isInactive ? '—' : range.minNights}
+                    </td>
                     <td className="py-3 text-right space-x-2">
                       <button
                         onClick={() => openEditDateRange(range)}
-                        className="text-amber-600 hover:text-amber-700"
+                        className="text-amber-600 hover:text-amber-700 cursor-pointer"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDeleteDateRange(range.id)}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-red-600 hover:text-red-700 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -543,7 +578,7 @@ export default function PricingPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigateMonth(-1)}
-                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -552,7 +587,7 @@ export default function PricingPage() {
               <span className="font-medium text-stone-900 min-w-[160px] text-center">{formatMonthYear()}</span>
               <button
                 onClick={() => navigateMonth(1)}
-                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -560,7 +595,7 @@ export default function PricingPage() {
               </button>
               <button
                 onClick={goToToday}
-                className="px-3 py-1 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                className="px-3 py-1 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               >
                 Today
               </button>
@@ -574,7 +609,7 @@ export default function PricingPage() {
                 setIsSelecting(!isSelecting)
                 if (isSelecting) setSelectedDates(new Set())
               }}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
                 isSelecting
                   ? 'bg-amber-100 text-amber-700'
                   : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
@@ -586,7 +621,7 @@ export default function PricingPage() {
             {selectedDates.size > 0 && (
               <button
                 onClick={() => setShowBulkModal(true)}
-                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm"
+                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm cursor-pointer"
               >
                 Edit {selectedDates.size} days
               </button>
@@ -616,8 +651,9 @@ export default function PricingPage() {
 
         {/* Calendar Grid */}
         {calendarLoading ? (
-          <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center justify-center h-64 gap-3">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800" />
+            <p className="text-sm text-stone-500">Loading calendar...</p>
           </div>
         ) : (
           <div className="grid grid-cols-7 gap-2">
@@ -703,7 +739,7 @@ export default function PricingPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className={`grid grid-cols-2 gap-4 ${dateRangeForm.isInactive ? 'opacity-50' : ''}`}>
                 <div>
                   <label className="block text-sm font-medium text-stone-700 mb-1">Weekday Price (EUR)</label>
                   <input
@@ -712,6 +748,7 @@ export default function PricingPage() {
                     onChange={(e) => setDateRangeForm({ ...dateRangeForm, weekdayPrice: e.target.value })}
                     placeholder="Sun-Thu"
                     className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    disabled={dateRangeForm.isInactive}
                   />
                 </div>
                 <div>
@@ -722,6 +759,7 @@ export default function PricingPage() {
                     onChange={(e) => setDateRangeForm({ ...dateRangeForm, weekendPrice: e.target.value })}
                     placeholder="Fri-Sat"
                     className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    disabled={dateRangeForm.isInactive}
                   />
                 </div>
               </div>
@@ -734,7 +772,23 @@ export default function PricingPage() {
                   value={dateRangeForm.minNights}
                   onChange={(e) => setDateRangeForm({ ...dateRangeForm, minNights: e.target.value })}
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  disabled={dateRangeForm.isInactive}
                 />
+              </div>
+
+              {/* Inactive Toggle */}
+              <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="dateRangeInactive"
+                  checked={dateRangeForm.isInactive}
+                  onChange={(e) => setDateRangeForm({ ...dateRangeForm, isInactive: e.target.checked })}
+                  className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer"
+                />
+                <label htmlFor="dateRangeInactive" className="text-sm text-stone-700 cursor-pointer">
+                  <span className="font-medium">Mark entire date range as inactive</span>
+                  <p className="text-xs text-stone-500">All days in this range will be unbookable</p>
+                </label>
               </div>
 
               {/* Error Message */}
@@ -752,13 +806,13 @@ export default function PricingPage() {
                   setEditingDateRange(null)
                   setDateRangeError(null)
                 }}
-                className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={editingDateRange ? handleUpdateDateRange : handleCreateDateRange}
-                className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
               >
                 {editingDateRange ? 'Update' : 'Create'}
               </button>
@@ -820,7 +874,7 @@ export default function PricingPage() {
             <div className="flex justify-between mt-6">
               <button
                 onClick={handleClearDayOverride}
-                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
               >
                 Clear Override
               </button>
@@ -830,13 +884,13 @@ export default function PricingPage() {
                     setShowDayModal(false)
                     setSelectedDay(null)
                   }}
-                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveDayOverride}
-                  className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                  className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
                 >
                   Save
                 </button>
@@ -899,20 +953,20 @@ export default function PricingPage() {
             <div className="flex justify-between mt-6">
               <button
                 onClick={handleBulkClear}
-                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
               >
                 Clear All Overrides
               </button>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowBulkModal(false)}
-                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBulkSave}
-                  className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                  className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
                 >
                   Apply to All
                 </button>

@@ -82,9 +82,13 @@ export async function POST(
   try {
     const data = await request.json()
 
-    // Validate required fields
-    if (!data.startDate || !data.endDate || data.weekdayPrice === undefined || data.weekendPrice === undefined) {
+    // Validate required fields (prices not required if marking as inactive)
+    const isInactive = data.isInactive === true
+    if (!data.startDate || !data.endDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    if (!isInactive && (data.weekdayPrice === undefined || data.weekendPrice === undefined)) {
+      return NextResponse.json({ error: 'Missing price fields' }, { status: 400 })
     }
 
     // Ensure end date is after start date
@@ -114,9 +118,10 @@ export async function POST(
         roomTypeId,
         startDate,
         endDate,
-        weekdayPrice: parseFloat(data.weekdayPrice),
-        weekendPrice: parseFloat(data.weekendPrice),
+        weekdayPrice: isInactive ? 0 : parseFloat(data.weekdayPrice),
+        weekendPrice: isInactive ? 0 : parseFloat(data.weekendPrice),
         minNights: parseInt(data.minNights) || 1,
+        isInactive,
       },
     })
 

@@ -1,6 +1,3 @@
-// Prisma schema for Accommodation Booking Admin System
-// Database: PostgreSQL via Neon
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -10,67 +7,54 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================
-// AUTHENTICATION
-// ============================================
-
 model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  password  String // bcrypt hashed
+  password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
 }
 
-// ============================================
-// ACCOMMODATION HIERARCHY
-// ============================================
-
 model Building {
-  id          String  @id @default(cuid())
-  name        String
-  address     String?
-  latitude    Float?
-  longitude   Float?
-  description Json?   @db.JsonB // Multilingual: {"en": "", "hu": "", "de": ""}
-
-  // Booking conditions (multilingual rich text)
-  cancellationPolicy Json? @db.JsonB // {"en": "", "hu": "", "de": ""}
-  paymentMethods     Json? @db.JsonB // {"en": "", "hu": "", "de": ""}
-  depositInfo        Json? @db.JsonB // {"en": "", "hu": "", "de": ""}
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  images            BuildingImage[]
-  houseRules        HouseRule[]
-  amenityCategories BuildingAmenityCategory[]
-  additionalPrices  BuildingAdditionalPrice[]
-  roomTypes         RoomType[]
+  id                 String                    @id @default(cuid())
+  name               String
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  description        Json?
+  cancellationPolicy Json?
+  paymentMethods     Json?
+  depositInfo        Json?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  additionalPrices   BuildingAdditionalPrice[]
+  amenityCategories  BuildingAmenityCategory[]
+  images             BuildingImage[]
+  houseRules         HouseRule[]
+  roomTypes          RoomType[]
 
   @@map("buildings")
 }
 
 model BuildingImage {
   id         String   @id @default(cuid())
-  url        String   // Path to uploaded WebP file
-  filename   String   @default("") // Original filename
+  url        String
+  filename   String   @default("")
   order      Int      @default(0)
   buildingId String
-  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
   @@map("building_images")
 }
 
 model HouseRule {
   id         String   @id @default(cuid())
-  key        Json     @db.JsonB // Multilingual: {"en": "Check-out", "hu": "Kijelentkezés", "de": "Abreise"}
-  value      Json     @db.JsonB // Multilingual: {"en": "10:00 AM", "hu": "10:00", "de": "10:00 Uhr"}
+  key        Json
+  value      Json
   order      Int      @default(0)
   buildingId String
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -80,18 +64,18 @@ model HouseRule {
 
 model BuildingAmenityCategory {
   id         String            @id @default(cuid())
-  name       Json              @db.JsonB // Multilingual: {"en": "Kitchen", "hu": "Konyha", "de": "Küche"}
+  name       Json
   order      Int               @default(0)
   buildingId String
-  building   Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   amenities  BuildingAmenity[]
+  building   Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
   @@map("building_amenity_categories")
 }
 
 model BuildingAmenity {
   id         String                  @id @default(cuid())
-  name       Json                    @db.JsonB // Multilingual: {"en": "Dishwasher", "hu": "Mosogatógép", "de": "Geschirrspüler"}
+  name       Json
   order      Int                     @default(0)
   categoryId String
   category   BuildingAmenityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -101,10 +85,10 @@ model BuildingAmenity {
 
 model BuildingAdditionalPrice {
   id         String   @id @default(cuid())
-  title      Json     @db.JsonB // Multilingual: {"en": "Cleaning fee", "hu": "Takarítási díj", "de": "Reinigungsgebühr"}
-  priceEur   Float // Price in EUR
+  title      Json
+  priceEur   Float
   mandatory  Boolean  @default(false)
-  perNight   Boolean  @default(false) // true = per night, false = per booking
+  perNight   Boolean  @default(false)
   order      Int      @default(0)
   buildingId String
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -112,57 +96,51 @@ model BuildingAdditionalPrice {
   @@map("building_additional_prices")
 }
 
-// ============================================
-// ROOM TYPES
-// ============================================
-
 model RoomType {
-  id          String   @id @default(cuid())
-  name        String
-  description Json?    @db.JsonB // NEW: Multilingual rich text description
-  capacity    Int // Number of adults
-  buildingId  String
-  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  images            RoomTypeImage[]
-  amenityCategories RoomTypeAmenityCategory[]
-  additionalPrices  RoomTypeAdditionalPrice[]
-  rooms             Room[]
-  dateRangePrices   DateRangePrice[]
+  id                String                    @id @default(cuid())
+  name              String
+  description       Json?
+  capacity          Int
+  buildingId        String
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
   calendarOverrides CalendarOverride[]
+  dateRangePrices   DateRangePrice[]
+  additionalPrices  RoomTypeAdditionalPrice[]
+  amenityCategories RoomTypeAmenityCategory[]
+  images            RoomTypeImage[]
+  building          Building                  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  rooms             Room[]
 
   @@map("room_types")
 }
 
 model RoomTypeImage {
   id         String   @id @default(cuid())
-  url        String   // Path to uploaded WebP file
-  filename   String   @default("") // Original filename
+  url        String
+  filename   String   @default("")
   order      Int      @default(0)
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   @@map("room_type_images")
 }
 
 model RoomTypeAmenityCategory {
   id         String            @id @default(cuid())
-  name       Json              @db.JsonB // Multilingual
+  name       Json
   order      Int               @default(0)
   roomTypeId String
-  roomType   RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
   amenities  RoomTypeAmenity[]
+  roomType   RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   @@map("room_type_amenity_categories")
 }
 
 model RoomTypeAmenity {
   id         String                  @id @default(cuid())
-  name       Json                    @db.JsonB // Multilingual
+  name       Json
   order      Int                     @default(0)
   categoryId String
   category   RoomTypeAmenityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -172,7 +150,7 @@ model RoomTypeAmenity {
 
 model RoomTypeAdditionalPrice {
   id         String   @id @default(cuid())
-  title      Json     @db.JsonB // Multilingual
+  title      Json
   priceEur   Float
   mandatory  Boolean  @default(false)
   perNight   Boolean  @default(false)
@@ -183,40 +161,31 @@ model RoomTypeAdditionalPrice {
   @@map("room_type_additional_prices")
 }
 
-// ============================================
-// ROOMS
-// ============================================
-
 model Room {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   name       String
-  isActive   Boolean  @default(true) // Inactive = visible in admin but not bookable online
+  isActive   Boolean   @default(true)
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  bookings Booking[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  bookings   Booking[]
+  roomType   RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   @@map("rooms")
 }
-
-// ============================================
-// PRICING
-// ============================================
 
 model DateRangePrice {
   id           String   @id @default(cuid())
   startDate    DateTime @db.Date
   endDate      DateTime @db.Date
-  weekdayPrice Float // Sun-Thu price in EUR
-  weekendPrice Float // Fri-Sat price in EUR
+  weekdayPrice Float
+  weekendPrice Float
   minNights    Int      @default(1)
   roomTypeId   String
-  roomType     RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  isInactive   Boolean  @default(false)
+  roomType     RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   @@map("date_range_prices")
 }
@@ -224,63 +193,36 @@ model DateRangePrice {
 model CalendarOverride {
   id         String   @id @default(cuid())
   date       DateTime @db.Date
-  price      Float? // Override price (null = use range price)
-  minNights  Int? // Override min nights (null = use range, 0 = no minimum)
-  isInactive Boolean  @default(false) // Day not bookable
+  price      Float?
+  minNights  Int?
+  isInactive Boolean  @default(false)
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   @@unique([roomTypeId, date])
   @@map("calendar_overrides")
 }
 
-// ============================================
-// BOOKINGS
-// ============================================
-
-enum BookingSource {
-  MANUAL      // Default for admin-created bookings
-  WEBSITE     // Yellow badge
-  BOOKING_COM // Blue badge
-  SZALLAS_HU  // Orange badge
-  AIRBNB      // Red badge
-}
-
-enum BookingStatus {
-  INCOMING // Grey - not confirmed
-  CONFIRMED // Green - confirmed
-  CANCELLED
-}
-
-enum PaymentStatus {
-  PENDING
-  DEPOSIT_PAID
-  FULLY_PAID
-  REFUNDED
-}
-
 model Booking {
-  id            String        @id @default(cuid())
-  source        BookingSource @default(MANUAL)
-  guestName     String
-  guestEmail    String?
-  guestPhone    String?
-  guestCount    Int // Number of guests
-  checkIn       DateTime      @db.Date // Check-in at 14:00
-  checkOut      DateTime      @db.Date // Check-out at 10:00
-  status        BookingStatus @default(INCOMING)
-  paymentStatus PaymentStatus @default(PENDING)
-  notes         String?       @db.Text
-  totalAmount   Float? // Total price in EUR
-  roomId        String
-  room          Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  // Relations
+  id               String                   @id @default(cuid())
+  source           BookingSource            @default(MANUAL)
+  guestName        String
+  guestEmail       String?
+  guestPhone       String?
+  guestCount       Int
+  checkIn          DateTime                 @db.Date
+  checkOut         DateTime                 @db.Date
+  status           BookingStatus            @default(INCOMING)
+  paymentStatus    PaymentStatus            @default(PENDING)
+  notes            String?
+  totalAmount      Float?
+  roomId           String
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
   additionalPrices BookingAdditionalPrice[]
+  room             Room                     @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@map("bookings")
 }
@@ -294,4 +236,25 @@ model BookingAdditionalPrice {
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("booking_additional_prices")
+}
+
+enum BookingSource {
+  MANUAL
+  WEBSITE
+  BOOKING_COM
+  SZALLAS_HU
+  AIRBNB
+}
+
+enum BookingStatus {
+  INCOMING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  DEPOSIT_PAID
+  FULLY_PAID
+  REFUNDED
 }

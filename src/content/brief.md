@@ -1,4 +1,4 @@
-# Accommodation Booking Admin System – Project Brief (Updated)
+# Accommodation Booking Admin System – Final Project Brief
 
 ## 0. General Context
 
@@ -24,7 +24,7 @@ Tech stack:
 - **Tailwind CSS**
 - Minimal, clean, light UI with soft shadows
 - Local-first database, later deployable on **Vercel**
-- Claude should choose the most suitable DB + ORM
+- Claude must choose the most suitable DB + ORM
 - Image uploads must be converted to **webp**
 
 ---
@@ -33,23 +33,38 @@ Tech stack:
 
 All **language-dependent content must be editable in EN / HU / DE**.
 
-A **global language selector** is required in the admin UI.
+A **global language selector inside the admin UI is NOT required**.
+All multilingual fields must be editable **inline per language**.
 
 Language-dependent fields include (but are not limited to):
 
-- Building description
+- Building name and description
 - Room Type name and description
-- Room description (if added later)
 - Additional Price titles
 - House Rules labels and values
-- Amenities names
-- Booking Conditions (Cancellation, Payment, Deposit)
+- Amenities names and categories
+- Booking Conditions:
+  - Cancellation Policy
+  - Payment Methods
+  - Deposit
 
 The data model must support structured multilingual storage.
 
 ---
 
-## 2. Accommodation Structure
+## 2. Admin Navigation
+
+### Sidebar Menu
+
+- The sidebar menu entry must be labeled **"Rooms"**
+- This section represents the full hierarchy:
+  - Buildings
+  - Room Types
+  - Rooms
+
+---
+
+## 3. Accommodation Structure
 
 ### Hierarchy
 
@@ -60,20 +75,20 @@ Building
 
 This hierarchy is used consistently across:
 - Admin UI
-- Booking timetable
 - Pricing
-- Availability
+- Booking timeline
+- Availability logic
 
 ---
 
-## 3. Building Management
+## 4. Building Management
 
 ### Editable fields
 
 - Name (multilingual)
 - Address OR latitude & longitude (Google Maps compatible)
 - Description (multilingual, rich text)
-- Images (ordered, upload → webp)
+- Images (ordered, file upload → webp)
 - House Rules:
   - N entries
   - Two multilingual text fields (e.g. "Check-out" : "10:00")
@@ -96,11 +111,11 @@ Buildings can be:
 - Created
 - Edited
 - Duplicated (without images)
-- Deleted (with double confirmation if dependencies exist)
+- Deleted (double confirmation if dependencies exist)
 
 ---
 
-## 4. Room Type Management
+## 5. Room Type Management
 
 ### Editable fields
 
@@ -108,7 +123,7 @@ Buildings can be:
 - Description (multilingual, rich text)
 - Capacity (number of adults)
 - Amenities (admin-defined, multilingual)
-- Images (ordered, upload → webp)
+- Images (ordered, file upload → webp)
 - Additional Prices (same structure as Building-level)
 
 Room Types:
@@ -118,7 +133,7 @@ Room Types:
 
 ---
 
-## 5. Room Management
+## 6. Room Management
 
 ### Fields
 
@@ -128,7 +143,9 @@ Room Types:
 
 Inactive rooms:
 - Are visible in admin UI (clearly marked)
-- Are NOT bookable on the public website
+- Are NOT bookable
+- Appear disabled in the booking timeline
+- Cannot receive new bookings
 
 Rooms can be:
 - Created
@@ -138,47 +155,60 @@ Rooms can be:
 
 ---
 
-## 6. Pricing Module (`/admin/prices`)
+## 7. Pricing Module (`/admin/prices`)
 
 Prices are defined **per Room Type**.
 
-### 6.1 Date Range Pricing
+### 7.1 Date Range Pricing
 
-Admins can define prices by selecting a date range:
+Admins can define pricing rules by selecting a date range:
 
 - Start date – End date
 - Weekday price (Sun–Thu)
 - Weekend price (Fri–Sat)
 - Minimum nights
+- **Active / Inactive toggle**
 
 Rules:
 - **Date ranges must NOT overlap**
-- The system must prevent saving overlapping ranges
+- A date range can be marked as inactive
+- Inactive ranges:
+  - Make all days unbookable
+  - Override any price values
 
 ---
 
-### 6.2 Calendar Pricing View
+### 7.2 Calendar Pricing View
 
 - Calendar view per Room Type
-- Displays:
-  - Day number
-  - Price per night
-  - Minimum nights (icon)
-- Days without price → grey
-- Inactive days → red
+- Always display:
+  - Selected Building
+  - Selected Room Type
+- Example label:
+  - *Building A → Lake View Double Room*
+
+Calendar cells display:
+- Day number
+- Price per night
+- Minimum nights (icon)
+
+Visual rules:
+- No price → grey
+- Inactive day → red
 
 Actions:
 - Click a single day → edit price / min nights / inactive
 - Select multiple days (mobile-friendly selection) → bulk edit
 
-Inactive day:
-- Makes the day unbookable for all rooms of that Room Type
+Inactive days:
+- Are not bookable
+- Affect all rooms of the Room Type
 
 ---
 
-## 7. Booking Management Module (CORE)
+## 8. Booking Management Module (CORE)
 
-### Booking Sources
+### 8.1 Booking Sources
 
 Each booking has a **Source**, shown with badge + color:
 
@@ -190,37 +220,41 @@ Each booking has a **Source**, shown with badge + color:
 
 ---
 
-### Booking Timeline UI
+### 8.2 Booking Timeline UI
 
 - Horizontal infinite scroll
 - Top row: dates (sticky)
 - Left column: rooms in hierarchy (sticky)
 - Scrollable content area
 - Date picker:
-  - Default selected date = **yesterday**
+  - Default date = **yesterday**
   - Scroll range = ± selected interval (e.g. ±3 months)
 
-Bookings are shown as **rectangular blocks**:
+Timeline rules:
+- Inactive rooms appear disabled and non-interactive
+- Pricing-inactive days are highlighted with **light red background**
+- These cells are non-clickable and non-bookable
 
+Bookings are shown as rectangular blocks:
 - Half-day offset:
   - Check-in: 14:00
   - Check-out: 10:00
-- Block displays:
+- Displayed inside block:
   - Guest name
-  - Number of guests
-  - Note icon (if exists)
-  - Additional price icon (if selected)
+  - Guest count
+  - Note icon
+  - Additional price icon
 
 Block color:
-- Grey → website booking (unconfirmed)
-- Green → admin-confirmed
+- Grey → unconfirmed website booking
+- Green → admin-confirmed booking
 
 Hover popup shows:
 - Guest name & contact
 - Room name
 - Guest count
 - Notes
-- Additional prices
+- Selected additional prices
 - Total amount
 - Booking status
 - Payment status
@@ -228,60 +262,87 @@ Hover popup shows:
 
 ---
 
-### Drag & Drop Bookings
+### 8.3 Drag & Drop Bookings
 
 Bookings can be dragged:
-- To different dates (same room)
+- To different dates
 - To a different room
 
 Rules:
-- Must fit availability
-- Must respect booking rules
+- Must respect availability
+- Must respect pricing and booking rules
 - Must not overlap other bookings
 
-If price changes:
+If total price changes:
 - Show warning modal
-- Require confirmation before applying changes
+- Display old vs new price
+- Require confirmation
 
 ---
 
-## 8. New Booking Logic (Admin)
+## 9. Add / Edit Booking Logic
 
 - Default Source = Manual
-- When Source = Manual:
-  - Total Amount is calculated from pricing rules
-  - Recalculated on every relevant change
-  - Amount is editable
-- For other sources:
-  - Total Amount is read-only (disabled)
+- All fields are **required**
+- Form cannot be saved with missing data
+
+### Pricing behavior
+
+- Mandatory additional prices:
+  - Automatically included
+  - Calculated per booking or per night
+- Optional additional prices:
+  - Selectable via checkbox
+  - Grouped by origin:
+    - Building-level
+    - Room Type–level
+  - Selection immediately recalculates total
+
+Total amount recalculates automatically when:
+- Dates change
+- Room or Room Type changes
+- Optional additional prices change
+
+Manual bookings:
+- Total amount is editable
+
+Non-manual bookings:
+- Total amount is read-only
 
 ---
 
-## 9. Image Handling
+## 10. Image Handling
 
-- All images must be uploaded as files
-- URLs are NOT allowed
-- Uploaded images are converted to **webp**
-- Image order is preserved
+- File upload only
+- No image URLs allowed
+- Convert all images to **webp**
+- Preserve image order
 
 ---
 
-## 10. Authentication & Users
+## 11. Authentication & Users
 
 - Admin authentication required
 - Users table:
   - Name
   - Email
   - Password
-- Admin UI to manage users
+- Admin UI for user management
 
 ---
 
-## 11. Admin UI Principles
+## 12. UI & Interaction Rules
 
-- Tailwind-based
-- Light, minimal, modern
-- Clear visual hierarchy
-- Soft shadows
-- Clear inactive / disabled states
+- All clickable elements must use `cursor: pointer`
+- Disabled elements must be visually distinct
+- For any time-consuming action:
+  - Show loading indicator or loading screen
+  - Clearly communicate progress to the user
+
+Actions requiring loading feedback:
+- Save
+- Update
+- Pricing changes
+- Booking creation or modification
+- Drag & drop operations
 
