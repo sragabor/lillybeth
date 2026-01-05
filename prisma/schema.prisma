@@ -249,6 +249,8 @@ enum BookingSource {
 enum BookingStatus {
   INCOMING
   CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
   CANCELLED
 }
 
