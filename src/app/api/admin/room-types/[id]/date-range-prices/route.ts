@@ -85,15 +85,28 @@ export async function POST(
     // Validate required fields (prices not required if marking as inactive)
     const isInactive = data.isInactive === true
     if (!data.startDate || !data.endDate) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json({ error: 'Start date and end date are required' }, { status: 400 })
     }
-    if (!isInactive && (data.weekdayPrice === undefined || data.weekendPrice === undefined)) {
-      return NextResponse.json({ error: 'Missing price fields' }, { status: 400 })
+
+    // Validate prices if not inactive - check for empty strings, null, undefined, and NaN
+    if (!isInactive) {
+      const weekdayPrice = data.weekdayPrice === '' || data.weekdayPrice === null || data.weekdayPrice === undefined
+        ? NaN : parseFloat(data.weekdayPrice)
+      const weekendPrice = data.weekendPrice === '' || data.weekendPrice === null || data.weekendPrice === undefined
+        ? NaN : parseFloat(data.weekendPrice)
+
+      if (isNaN(weekdayPrice) || isNaN(weekendPrice)) {
+        return NextResponse.json({ error: 'Weekday price and weekend price are required' }, { status: 400 })
+      }
     }
 
     // Ensure end date is after start date
     const startDate = new Date(data.startDate)
     const endDate = new Date(data.endDate)
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
+    }
 
     if (endDate < startDate) {
       return NextResponse.json({ error: 'End date must be after start date' }, { status: 400 })
@@ -113,14 +126,19 @@ export async function POST(
       }, { status: 409 })
     }
 
+    // Parse values safely
+    const weekdayPrice = isInactive ? 0 : parseFloat(data.weekdayPrice)
+    const weekendPrice = isInactive ? 0 : parseFloat(data.weekendPrice)
+    const minNights = parseInt(data.minNights) || 1
+
     const dateRangePrice = await prisma.dateRangePrice.create({
       data: {
         roomTypeId,
         startDate,
         endDate,
-        weekdayPrice: isInactive ? 0 : parseFloat(data.weekdayPrice),
-        weekendPrice: isInactive ? 0 : parseFloat(data.weekendPrice),
-        minNights: parseInt(data.minNights) || 1,
+        weekdayPrice,
+        weekendPrice,
+        minNights,
         isInactive,
       },
     })
@@ -128,6 +146,8 @@ export async function POST(
     return NextResponse.json({ dateRangePrice }, { status: 201 })
   } catch (error) {
     console.error('Error creating date range price:', error)
-    return NextResponse.json({ error: 'Failed to create date range price' }, { status: 500 })
+    // Return more specific error message if available
+    const message = error instanceof Error ? error.message : 'Failed to create date range price'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

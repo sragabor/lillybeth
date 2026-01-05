@@ -62,9 +62,16 @@ interface TimelineData {
   inactiveDaysByRoomType: Record<string, string[]>
 }
 
+// Timeline row types for hierarchical display
+type TimelineRow =
+  | { type: 'building'; building: Building }
+  | { type: 'roomType'; roomType: RoomType; buildingName: string }
+  | { type: 'room'; room: Room; roomTypeName: string; roomTypeId: string; buildingName: string }
+
 // Constants
 const DAY_WIDTH = 120 // pixels per day
 const ROOM_HEIGHT = 50 // pixels per room row
+const HEADER_ROW_HEIGHT = 36 // pixels per building/room type header row
 const ROOM_COLUMN_WIDTH = 200 // left sidebar width
 const HEADER_HEIGHT = 60 // top header height
 
@@ -589,31 +596,62 @@ export default function BookingsPage() {
     setShowDragWarningModal(false)
   }
 
-  // Get all rooms flattened
-  const getAllRooms = () => {
+  // Get timeline rows in hierarchical order: Building > Room Type > Room
+  const getTimelineRows = (): TimelineRow[] => {
     if (!timelineData?.buildings) return []
-    const rooms: { room: Room; buildingName: string; roomTypeName: string }[] = []
+    const rows: TimelineRow[] = []
     timelineData.buildings.forEach((building) => {
+      // Add building header
+      rows.push({ type: 'building', building })
       building.roomTypes?.forEach((roomType) => {
+        // Add room type header
+        rows.push({ type: 'roomType', roomType, buildingName: building.name })
         roomType.rooms?.forEach((room) => {
-          rooms.push({
+          // Add room row
+          rows.push({
+            type: 'room',
             room,
-            buildingName: building.name,
             roomTypeName: roomType.name,
+            roomTypeId: roomType.id,
+            buildingName: building.name,
           })
         })
       })
     })
-    return rooms
+    return rows
   }
 
-  const allRooms = getAllRooms()
+  const timelineRows = getTimelineRows()
 
-  // Check if a specific date is inactive for a room
-  const isDayInactive = (roomId: string, dateStr: string): boolean => {
+  // Get only room rows for booking operations
+  const roomRows = timelineRows.filter((row): row is TimelineRow & { type: 'room' } => row.type === 'room')
+
+  // Calculate total height considering different row heights
+  const calculateTotalHeight = () => {
+    return timelineRows.reduce((total, row) => {
+      return total + (row.type === 'room' ? ROOM_HEIGHT : HEADER_ROW_HEIGHT)
+    }, 0)
+  }
+
+  // Calculate Y position for a given row index
+  const calculateRowTop = (rowIndex: number): number => {
+    let top = 0
+    for (let i = 0; i < rowIndex; i++) {
+      top += timelineRows[i].type === 'room' ? ROOM_HEIGHT : HEADER_ROW_HEIGHT
+    }
+    return top
+  }
+
+  // Find room row index for booking positioning
+  const findRoomRowIndex = (roomId: string): number => {
+    return timelineRows.findIndex(
+      (row) => row.type === 'room' && row.room.id === roomId
+    )
+  }
+
+  // Check if a specific date is inactive for a room type
+  const isDayInactive = (roomTypeId: string, dateStr: string): boolean => {
     if (!timelineData) return false
-    const roomTypeId = timelineData.roomToRoomType[roomId]
-    if (!roomTypeId) return false
     const inactiveDays = timelineData.inactiveDaysByRoomType[roomTypeId]
     return inactiveDays?.includes(dateStr) || false
   }
@@ -802,8 +840,9 @@ export default function BookingsPage() {
             </div>
           </div>
 
-          {/* Fixed left column (rooms) */}
+          {/* Fixed left column (hierarchical: Building > Room Type > Room) */}
           <div
+            data-room-sidebar
             className="absolute left-0 bg-white border-r border-stone-200 z-20 overflow-y-auto"
             style={{ top: HEADER_HEIGHT, bottom: 0, width: ROOM_COLUMN_WIDTH, scrollbarWidth: 'none' }}
             onScroll={(e) => {
@@ -815,31 +854,57 @@ export default function BookingsPage() {
               }
             }}
           >
-            {allRooms.map(({ room, buildingName, roomTypeName }, index) => (
-              <div
-                key={room.id}
-                className={`border-b border-stone-100 px-3 flex items-center ${
-                  !room.isActive ? 'bg-stone-100' : ''
-                }`}
-                style={{ height: ROOM_HEIGHT }}
-              >
-                <div className="min-w-0 flex items-center gap-2">
-                  <div>
-                    <p className={`text-sm font-medium truncate ${!room.isActive ? 'text-stone-400' : 'text-stone-900'}`}>
-                      {room.name}
-                    </p>
-                    <p className="text-xs text-stone-500 truncate">
-                      {buildingName} / {roomTypeName}
+            {timelineRows.map((row, index) => {
+              if (row.type === 'building') {
+                return (
+                  <div
+                    key={`building-${row.building.id}`}
+                    className="border-b border-stone-200 px-3 flex items-center bg-stone-800"
+                    style={{ height: HEADER_ROW_HEIGHT }}
+                  >
+                    <p className="text-sm font-semibold text-white truncate">
+                      {row.building.name}
                     </p>
                   </div>
-                  {!room.isActive && (
-                    <span className="flex-shrink-0 text-xs px-1.5 py-0.5 bg-stone-200 text-stone-500 rounded">
-                      Inactive
-                    </span>
-                  )}
+                )
+              }
+
+              if (row.type === 'roomType') {
+                return (
+                  <div
+                    key={`roomType-${row.roomType.id}`}
+                    className="border-b border-stone-200 px-3 pl-5 flex items-center bg-stone-100"
+                    style={{ height: HEADER_ROW_HEIGHT }}
+                  >
+                    <p className="text-xs font-medium text-stone-600 truncate">
+                      {row.roomType.name}
+                    </p>
+                  </div>
+                )
+              }
+
+              // Room row
+              return (
+                <div
+                  key={`room-${row.room.id}`}
+                  className={`border-b border-stone-100 px-3 pl-8 flex items-center ${
+                    !row.room.isActive ? 'bg-stone-50' : ''
+                  }`}
+                  style={{ height: ROOM_HEIGHT }}
+                >
+                  <div className="min-w-0 flex items-center gap-2">
+                    <p className={`text-sm truncate ${!row.room.isActive ? 'text-stone-400' : 'text-stone-900'}`}>
+                      {row.room.name}
+                    </p>
+                    {!row.room.isActive && (
+                      <span className="flex-shrink-0 text-xs px-1.5 py-0.5 bg-stone-200 text-stone-500 rounded">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Main content area */}
@@ -868,7 +933,7 @@ export default function BookingsPage() {
               className="relative"
               style={{
                 width: dates.length * DAY_WIDTH,
-                height: allRooms.length * ROOM_HEIGHT,
+                height: calculateTotalHeight(),
               }}
             >
               {/* Grid lines */}
@@ -886,27 +951,35 @@ export default function BookingsPage() {
                 )
               })}
 
-              {/* Room row lines */}
-              {allRooms.map((_, index) => (
-                <div
-                  key={`row-${index}`}
-                  className="absolute left-0 right-0 border-b border-stone-100"
-                  style={{ top: (index + 1) * ROOM_HEIGHT }}
-                />
-              ))}
+              {/* Row lines matching hierarchy */}
+              {timelineRows.map((row, index) => {
+                const top = calculateRowTop(index)
+                const height = row.type === 'room' ? ROOM_HEIGHT : HEADER_ROW_HEIGHT
+                const isHeader = row.type !== 'room'
+                return (
+                  <div
+                    key={`row-${index}`}
+                    className={`absolute left-0 right-0 border-b ${isHeader ? 'border-stone-200 bg-stone-50/30' : 'border-stone-100'}`}
+                    style={{ top, height }}
+                  />
+                )
+              })}
 
-              {/* Click areas for creating bookings and drop targets */}
-              {allRooms.map(({ room }, roomIndex) => (
-                dates.map((date, dateIndex) => {
+              {/* Click areas for creating bookings and drop targets - ONLY for room rows */}
+              {timelineRows.map((row, rowIndex) => {
+                if (row.type !== 'room') return null
+                const rowTop = calculateRowTop(rowIndex)
+
+                return dates.map((date, dateIndex) => {
                   const dateStr = date.toISOString().split('T')[0]
-                  const isDropTarget = dragOverRoom === room.id && dragOverDate === dateStr
-                  const isRoomInactive = !room.isActive
-                  const isDateInactive = isDayInactive(room.id, dateStr)
+                  const isDropTarget = dragOverRoom === row.room.id && dragOverDate === dateStr
+                  const isRoomInactive = !row.room.isActive
+                  const isDateInactive = isDayInactive(row.roomTypeId, dateStr)
                   const isDisabled = isRoomInactive || isDateInactive
 
                   return (
                     <div
-                      key={`click-${room.id}-${dateIndex}`}
+                      key={`click-${row.room.id}-${dateIndex}`}
                       className={`absolute transition-colors ${
                         isDateInactive
                           ? 'bg-red-100/80 cursor-not-allowed'
@@ -918,23 +991,26 @@ export default function BookingsPage() {
                       }`}
                       style={{
                         left: dateIndex * DAY_WIDTH,
-                        top: roomIndex * ROOM_HEIGHT,
+                        top: rowTop,
                         width: DAY_WIDTH,
                         height: ROOM_HEIGHT,
                       }}
-                      onClick={() => !draggingBooking && !isDisabled && openCreateBooking(room.id, dateStr)}
-                      onDragOver={(e) => !isDisabled && handleDragOver(room.id, dateStr, e)}
+                      onClick={() => !draggingBooking && !isDisabled && openCreateBooking(row.room.id, dateStr)}
+                      onDragOver={(e) => !isDisabled && handleDragOver(row.room.id, dateStr, e)}
                       onDragLeave={handleDragLeave}
-                      onDrop={(e) => !isDisabled && handleDrop(room.id, dateStr, e)}
+                      onDrop={(e) => !isDisabled && handleDrop(row.room.id, dateStr, e)}
                       title={isDateInactive ? 'This day is marked as inactive' : isRoomInactive ? 'This room is inactive' : undefined}
                     />
                   )
                 })
-              ))}
+              })}
 
               {/* Bookings */}
-              {allRooms.map(({ room }, roomIndex) => {
-                const roomBookings = timelineData?.bookingsByRoom[room.id] || []
+              {roomRows.map((row) => {
+                const roomBookings = timelineData?.bookingsByRoom[row.room.id] || []
+                const rowIndex = findRoomRowIndex(row.room.id)
+                const rowTop = calculateRowTop(rowIndex)
+
                 return roomBookings.map((booking) => {
                   const { left, width } = getBookingPosition(booking)
                   const colors = SOURCE_COLORS[booking.source]
@@ -954,7 +1030,7 @@ export default function BookingsPage() {
                       }`}
                       style={{
                         left: Math.max(0, left),
-                        top: roomIndex * ROOM_HEIGHT + 4,
+                        top: rowTop + 4,
                         width: Math.min(width, dates.length * DAY_WIDTH - left),
                         height: ROOM_HEIGHT - 8,
                       }}

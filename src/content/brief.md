@@ -1,4 +1,9 @@
-# Accommodation Booking Admin System – Final Project Brief
+# Accommodation Booking Admin System – Project Brief (FINAL)
+
+This brief includes **all feature definitions and all feedback rounds up to this point**.
+Any further changes must be added as **new feedback or new feature extensions**.
+
+---
 
 ## 0. General Context
 
@@ -33,7 +38,7 @@ Tech stack:
 
 All **language-dependent content must be editable in EN / HU / DE**.
 
-A **global language selector inside the admin UI is NOT required**.
+A global language selector inside the admin UI is **NOT required**.
 All multilingual fields must be editable **inline per language**.
 
 Language-dependent fields include (but are not limited to):
@@ -68,10 +73,9 @@ The data model must support structured multilingual storage.
 
 ### Hierarchy
 
-Building
-└─ Room Type
+Building  
+└─ Room Type  
 └─ Room
-
 
 This hierarchy is used consistently across:
 - Admin UI
@@ -172,9 +176,14 @@ Admins can define pricing rules by selecting a date range:
 Rules:
 - **Date ranges must NOT overlap**
 - A date range can be marked as inactive
-- Inactive ranges:
-  - Make all days unbookable
-  - Override any price values
+- Date range creation must fail ONLY if:
+  - The date range overlaps
+  - Required fields are missing
+- Generic backend failures without validation feedback are not acceptable
+
+Inactive ranges:
+- Make all days unbookable
+- Override any price values
 
 ---
 
@@ -194,15 +203,21 @@ Calendar cells display:
 
 Visual rules:
 - No price → grey
-- Inactive day → red
+- Inactive day → light red
 
 Actions:
 - Click a single day → edit price / min nights / inactive
 - Select multiple days (mobile-friendly selection) → bulk edit
 
-Inactive days:
-- Are not bookable
-- Affect all rooms of the Room Type
+Pricing availability is the **single source of truth**.
+
+If a date is inactive:
+- It must be disabled for **ALL rooms** of the Room Type
+- Booking timeline cells:
+  - Light red background
+  - `cursor: not-allowed`
+  - Non-clickable
+  - Must NOT open the “New Booking” modal
 
 ---
 
@@ -220,20 +235,67 @@ Each booking has a **Source**, shown with badge + color:
 
 ---
 
-### 8.2 Booking Timeline UI
+### 8.2 Booking Timeline UI (CRITICAL)
+
+The booking timeline is a **structural overview** and must always render the **full accommodation hierarchy**.
+
+#### Mandatory Rules
+
+- Buildings must ALWAYS be loaded
+- Room Types must ALWAYS be loaded
+- Rooms must ALWAYS be loaded
+
+This applies even if:
+- The room is inactive
+- There are no bookings
+- Pricing marks all days as inactive
+
+#### Forbidden Behavior
+
+- Filtering inactive rooms at query level
+- Filtering by pricing availability at query level
+- Using INNER JOINs that hide rooms without bookings
+- Hiding buildings or room types because they contain no bookings
+
+#### Correct Behavior
+
+- Timeline data loading is **STRUCTURAL**
+- Availability and inactivity are handled **ONLY at UI / interaction level**
+
+#### Regression Rule
+
+The booking timeline must NEVER render empty due to:
+- Missing bookings
+- Inactive rooms
+- Inactive pricing
+- Filtering logic
+
+Structure must always render first, data overlays second.
+
+---
+
+### Timeline Layout
 
 - Horizontal infinite scroll
 - Top row: dates (sticky)
-- Left column: rooms in hierarchy (sticky)
-- Scrollable content area
-- Date picker:
-  - Default date = **yesterday**
-  - Scroll range = ± selected interval (e.g. ±3 months)
+- Left column: hierarchy (sticky):
+  - Building rows (header only)
+  - Room Type rows (header only)
+  - Room rows (bookable)
 
-Timeline rules:
-- Inactive rooms appear disabled and non-interactive
-- Pricing-inactive days are highlighted with **light red background**
-- These cells are non-clickable and non-bookable
+Building and Room Type rows:
+- Are headers only
+- Must NEVER be clickable
+- Must NEVER open booking interactions
+
+Date picker:
+- Default date = **yesterday**
+- Scroll range = ± selected interval (e.g. ±3 months)
+
+Timeline UI rules:
+- Inactive rooms appear visually disabled and non-interactive
+- Pricing-inactive days are highlighted with light red background
+- Disabled cells are non-clickable and non-bookable
 
 Bookings are shown as rectangular blocks:
 - Half-day offset:
@@ -345,4 +407,3 @@ Actions requiring loading feedback:
 - Pricing changes
 - Booking creation or modification
 - Drag & drop operations
-
