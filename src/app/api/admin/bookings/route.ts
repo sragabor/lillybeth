@@ -230,6 +230,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Room is already booked for these dates' }, { status: 400 })
     }
 
+    // Prepare additional prices data if provided
+    const additionalPricesCreate = Array.isArray(data.additionalPrices)
+      ? data.additionalPrices.map((price: { title: string; priceEur: number; quantity?: number }) => ({
+          title: price.title,
+          priceEur: price.priceEur,
+          quantity: price.quantity || 1,
+        }))
+      : []
+
     const booking = await prisma.booking.create({
       data: {
         roomId: data.roomId,
@@ -244,6 +253,9 @@ export async function POST(request: NextRequest) {
         paymentStatus: data.paymentStatus || 'PENDING',
         notes: data.notes || null,
         totalAmount: data.totalAmount ? parseFloat(data.totalAmount) : null,
+        additionalPrices: {
+          create: additionalPricesCreate,
+        },
       },
       include: {
         room: {

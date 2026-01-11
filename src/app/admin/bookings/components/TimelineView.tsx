@@ -9,8 +9,11 @@ import {
   AvailableRoom,
   SOURCE_COLORS,
   SOURCE_LABELS,
+  SOURCE_ICONS,
   STATUS_COLORS,
+  STATUS_LABELS,
   PAYMENT_LABELS,
+  PAYMENT_COLORS,
 } from '../types'
 import BookingModal from './BookingModal'
 
@@ -152,6 +155,7 @@ export default function TimelineView({
               room,
               building: building.name,
               roomType: roomType.name,
+              capacity: roomType.capacity,
             })
           })
         })
@@ -512,9 +516,9 @@ export default function TimelineView({
 
           {/* Legend */}
           <div className="flex items-center gap-4 ml-auto text-sm flex-wrap">
-            {Object.entries(SOURCE_COLORS).map(([source, colors]) => (
+            {Object.entries(SOURCE_ICONS).map(([source, icon]) => (
               <div key={source} className="flex items-center gap-1">
-                <div className={`w-3 h-3 rounded ${colors.badge}`} />
+                <img src={icon} alt={source} className="w-4 h-4 object-contain" />
                 <span className="text-stone-600">{SOURCE_LABELS[source as keyof typeof SOURCE_LABELS]}</span>
               </div>
             ))}
@@ -782,7 +786,7 @@ export default function TimelineView({
                       onMouseLeave={() => setHoveredBooking(null)}
                     >
                       <div className="h-full px-2 py-1 flex items-center gap-2 overflow-hidden">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${colors.badge}`} />
+                        <img src={SOURCE_ICONS[booking.source]} alt={booking.source} className="w-4 h-4 object-contain flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <p className={`text-xs font-medium truncate ${colors.text}`}>
                             {booking.guestName}
@@ -792,6 +796,13 @@ export default function TimelineView({
                           </p>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
+                          {/* Payment status indicator */}
+                          <span className={`w-2 h-2 rounded-full ${
+                            booking.paymentStatus === 'FULLY_PAID' ? 'bg-green-500' :
+                            booking.paymentStatus === 'PARTIALLY_PAID' ? 'bg-amber-500' :
+                            booking.paymentStatus === 'REFUNDED' ? 'bg-red-500' :
+                            'bg-stone-300'
+                          }`} title={PAYMENT_LABELS[booking.paymentStatus]} />
                           {booking.notes && (
                             <svg className={`w-3 h-3 ${colors.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -832,25 +843,23 @@ export default function TimelineView({
       {/* Hover Popup */}
       {hoveredBooking && (
         <div
-          className="fixed z-50 bg-white rounded-xl shadow-xl border border-stone-200 p-4 w-72 pointer-events-none"
+          className="fixed z-50 bg-white rounded-xl shadow-xl border border-stone-200 p-4 w-80 pointer-events-none"
           style={{
-            left: Math.min(hoverPosition.x + 10, window.innerWidth - 300),
-            top: Math.min(hoverPosition.y + 10, window.innerHeight - 300),
+            left: Math.min(hoverPosition.x + 10, window.innerWidth - 340),
+            top: Math.min(hoverPosition.y + 10, window.innerHeight - 350),
           }}
         >
+          {/* Header with source and status badges */}
           <div className="flex items-center gap-2 mb-3">
-            <div className={`w-3 h-3 rounded-full ${SOURCE_COLORS[hoveredBooking.source].badge}`} />
+            <img src={SOURCE_ICONS[hoveredBooking.source]} alt={hoveredBooking.source} className="w-4 h-4 object-contain" />
             <span className="text-xs font-medium text-stone-600">
               {SOURCE_LABELS[hoveredBooking.source]}
             </span>
-            <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
-              hoveredBooking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
-              hoveredBooking.status === 'CHECKED_IN' ? 'bg-green-100 text-green-700' :
-              hoveredBooking.status === 'CHECKED_OUT' ? 'bg-emerald-100 text-emerald-700' :
-              'bg-stone-100 text-stone-700'
-            }`}>
-              {hoveredBooking.status.replace('_', ' ')}
-            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[hoveredBooking.status].bg} ${STATUS_COLORS[hoveredBooking.status].text}`}>
+                {STATUS_LABELS[hoveredBooking.status]}
+              </span>
+            </div>
           </div>
 
           <h4 className="font-semibold text-stone-900">{hoveredBooking.guestName}</h4>
@@ -882,14 +891,22 @@ export default function TimelineView({
             </div>
           )}
 
-          <div className="mt-3 pt-3 border-t border-stone-200 flex justify-between text-sm">
-            <span className="text-stone-600">Payment: {PAYMENT_LABELS[hoveredBooking.paymentStatus]}</span>
-            {hoveredBooking.totalAmount && (
-              <span className="font-semibold text-stone-900">{hoveredBooking.totalAmount} EUR</span>
-            )}
+          {/* Payment Status and Total */}
+          <div className="mt-3 pt-3 border-t border-stone-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-500">Payment:</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${PAYMENT_COLORS[hoveredBooking.paymentStatus].bg} ${PAYMENT_COLORS[hoveredBooking.paymentStatus].text}`}>
+                  {PAYMENT_LABELS[hoveredBooking.paymentStatus]}
+                </span>
+              </div>
+              {hoveredBooking.totalAmount && (
+                <span className="font-semibold text-stone-900">{hoveredBooking.totalAmount.toFixed(2)} EUR</span>
+              )}
+            </div>
           </div>
 
-          <p className="mt-2 text-xs text-amber-600">Click to view details</p>
+          <p className="mt-2 text-xs text-amber-600">Click to view details & manage</p>
         </div>
       )}
 

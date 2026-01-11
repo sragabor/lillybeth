@@ -1,7 +1,13 @@
-# Accommodation Booking Admin System – Project Brief (FINAL)
+# Accommodation Booking Admin System – Project Brief (FINAL, UPDATED)
 
-This brief includes **all feature definitions and all feedback rounds up to this point**.
-Any further changes must be added as **new feedback or new feature extensions**.
+This brief includes:
+- All core features
+- All feedback rounds
+- All post-MVP feature extensions
+- All bugfix-related clarifications
+
+It is the **single source of truth**.
+Any further changes must be introduced as new feedback or new feature documents.
 
 ---
 
@@ -81,6 +87,7 @@ This hierarchy is used consistently across:
 - Admin UI
 - Pricing
 - Booking timeline
+- Booking list view
 - Availability logic
 
 ---
@@ -95,7 +102,7 @@ This hierarchy is used consistently across:
 - Images (ordered, file upload → webp)
 - House Rules:
   - N entries
-  - Two multilingual text fields (e.g. "Check-out" : "10:00")
+  - Two multilingual text fields
 - Amenities:
   - Admin-defined
   - Grouped by category
@@ -108,8 +115,8 @@ This hierarchy is used consistently across:
   - N entries
   - Multilingual title
   - Price (EUR)
-  - Mandatory / Optional (checkbox)
-  - Per night / Per booking (radio)
+  - Mandatory / Optional
+  - Per night / Per booking
 
 Buildings can be:
 - Created
@@ -146,16 +153,10 @@ Room Types:
 - Active / Inactive toggle
 
 Inactive rooms:
-- Are visible in admin UI (clearly marked)
-- Are NOT bookable
-- Appear disabled in the booking timeline
-- Cannot receive new bookings
-
-Rooms can be:
-- Created
-- Edited
-- Duplicated
-- Deleted
+- Visible in admin UI
+- Clearly marked
+- NOT bookable
+- Disabled in all booking views
 
 ---
 
@@ -165,224 +166,200 @@ Prices are defined **per Room Type**.
 
 ### 7.1 Date Range Pricing
 
-Admins can define pricing rules by selecting a date range:
-
 - Start date – End date
-- Weekday price (Sun–Thu)
-- Weekend price (Fri–Sat)
+- Weekday price
+- Weekend price
 - Minimum nights
-- **Active / Inactive toggle**
+- Active / Inactive toggle
 
 Rules:
-- **Date ranges must NOT overlap**
-- A date range can be marked as inactive
-- Date range creation must fail ONLY if:
-  - The date range overlaps
-  - Required fields are missing
-- Generic backend failures without validation feedback are not acceptable
-
-Inactive ranges:
-- Make all days unbookable
-- Override any price values
+- Date ranges must NOT overlap
+- Creation must fail only on overlap or missing fields
+- Inactive ranges make all days unbookable
 
 ---
 
 ### 7.2 Calendar Pricing View
 
-- Calendar view per Room Type
-- Always display:
-  - Selected Building
-  - Selected Room Type
-- Example label:
-  - *Building A → Lake View Double Room*
+- Calendar per Room Type
+- Always shows:
+  - Building name
+  - Room Type name
 
-Calendar cells display:
-- Day number
-- Price per night
-- Minimum nights (icon)
-
-Visual rules:
+Calendar cell states:
 - No price → grey
-- Inactive day → light red
-
-Actions:
-- Click a single day → edit price / min nights / inactive
-- Select multiple days (mobile-friendly selection) → bulk edit
+- Inactive → light red
 
 Pricing availability is the **single source of truth**.
 
-If a date is inactive:
-- It must be disabled for **ALL rooms** of the Room Type
-- Booking timeline cells:
-  - Light red background
-  - `cursor: not-allowed`
-  - Non-clickable
-  - Must NOT open the “New Booking” modal
+Inactive days:
+- Disable booking in all views
+- Are non-clickable
+- Show `cursor: not-allowed`
 
 ---
 
-## 8. Booking Management Module (CORE)
+## 8. Booking Management (CORE)
 
 ### 8.1 Booking Sources
 
-Each booking has a **Source**, shown with badge + color:
+Sources:
+- Website
+- Manual
+- Booking.com
+- Szállás.hu
+- Airbnb
 
-- Website → yellow
-- Manual → grey (default for admin-created bookings)
-- Booking.com → blue
-- Szállás.hu → orange
-- Airbnb → red
-
----
-
-### 8.2 Booking Timeline UI (CRITICAL)
-
-The booking timeline is a **structural overview** and must always render the **full accommodation hierarchy**.
-
-#### Mandatory Rules
-
-- Buildings must ALWAYS be loaded
-- Room Types must ALWAYS be loaded
-- Rooms must ALWAYS be loaded
-
-This applies even if:
-- The room is inactive
-- There are no bookings
-- Pricing marks all days as inactive
-
-#### Forbidden Behavior
-
-- Filtering inactive rooms at query level
-- Filtering by pricing availability at query level
-- Using INNER JOINs that hide rooms without bookings
-- Hiding buildings or room types because they contain no bookings
-
-#### Correct Behavior
-
-- Timeline data loading is **STRUCTURAL**
-- Availability and inactivity are handled **ONLY at UI / interaction level**
-
-#### Regression Rule
-
-The booking timeline must NEVER render empty due to:
-- Missing bookings
-- Inactive rooms
-- Inactive pricing
-- Filtering logic
-
-Structure must always render first, data overlays second.
+Source representation:
+- **Icons only**
+- Icons loaded from `/public/icons`
+- No color-dot indicators allowed
 
 ---
 
-### Timeline Layout
+### 8.2 Booking Statuses
 
-- Horizontal infinite scroll
-- Top row: dates (sticky)
-- Left column: hierarchy (sticky):
-  - Building rows (header only)
-  - Room Type rows (header only)
-  - Room rows (bookable)
+Supported statuses:
+- Incoming / Pending
+- Confirmed
+- Cancelled
+- Guest Arrived (Checked-in)
+- Guest Departed (Checked-out)
 
-Building and Room Type rows:
-- Are headers only
-- Must NEVER be clickable
-- Must NEVER open booking interactions
+Rules:
+- Checked-in / Checked-out are valid, persistable states
+- Must save without errors
+- Shown with green-toned icons + labels
+- Displayed consistently in:
+  - Timeline View
+  - Booking List View
+  - Booking detail views
 
-Date picker:
-- Default date = **yesterday**
-- Scroll range = ± selected interval (e.g. ±3 months)
+---
 
-Timeline UI rules:
-- Inactive rooms appear visually disabled and non-interactive
-- Pricing-inactive days are highlighted with light red background
-- Disabled cells are non-clickable and non-bookable
+## 9. Booking Timeline View
 
-Bookings are shown as rectangular blocks:
-- Half-day offset:
-  - Check-in: 14:00
-  - Check-out: 10:00
-- Displayed inside block:
-  - Guest name
-  - Guest count
-  - Note icon
-  - Additional price icon
+- Hierarchical rendering:
+  - Building (header)
+  - Room Type (header)
+  - Room (bookable row)
+- Always renders structure
+- Never filtered at data-query level
 
-Block color:
-- Grey → unconfirmed website booking
-- Green → admin-confirmed booking
+UI rules:
+- Inactive rooms disabled
+- Pricing-inactive days disabled
+- Half-day booking blocks (14:00 → 10:00)
 
-Hover popup shows:
-- Guest name & contact
-- Room name
-- Guest count
-- Notes
-- Selected additional prices
+Drag & Drop:
+- Allowed between rooms and dates
+- Must respect availability
+- Price change requires confirmation
+
+---
+
+## 10. Booking List View (NEW)
+
+An alternative booking view in addition to Timeline View.
+
+### Tabs
+- All Bookings
+- Upcoming Bookings
+- Past Bookings
+
+### Table columns
+
+- Booking ID (6-digit incremental)
+- Guest name + phone
+- Dates
+- Nights
+- Guests
 - Total amount
 - Booking status
 - Payment status
-- Link to full booking details
+- Note icon
+- Additional price icon
+
+Under guest name:
+- Building badge (grey)
+- Room Type badge (orange)
+- Room badge (blue)
+
+### Expandable rows
+
+- Inline expansion
+- Full booking details
+- Price breakdown
+- Edit Booking button
+- Uses SAME modal as Timeline View
+
+### Sorting & Pagination
+
+Default sorting:
+- Upcoming → Start date ASC
+- Past → Start date DESC
+- All → Start date ASC
+
+Sortable by:
+- Name
+- Dates
+- Nights
+- Guests
+- Price
+
+Cancelled bookings:
+- Visible in All Bookings
+- Light red row background
 
 ---
 
-### 8.3 Drag & Drop Bookings
+## 11. Booking Filters
 
-Bookings can be dragged:
-- To different dates
-- To a different room
+### Global (All booking views)
 
-Rules:
-- Must respect availability
-- Must respect pricing and booking rules
-- Must not overlap other bookings
+- Building
+- Room Type
+- Booking Source
 
-If total price changes:
-- Show warning modal
-- Display old vs new price
-- Require confirmation
+### Booking List View only
+
+- Date range
+- Room
+
+Filters must:
+- Never break hierarchy
+- Never hide structure
+- Apply instantly
 
 ---
 
-## 9. Add / Edit Booking Logic
+## 12. Booking Creation & Editing
 
-- Default Source = Manual
-- All fields are **required**
-- Form cannot be saved with missing data
+- Default source: Manual
+- All fields required
 
-### Pricing behavior
-
-- Mandatory additional prices:
-  - Automatically included
-  - Calculated per booking or per night
-- Optional additional prices:
-  - Selectable via checkbox
-  - Grouped by origin:
-    - Building-level
-    - Room Type–level
-  - Selection immediately recalculates total
-
-Total amount recalculates automatically when:
-- Dates change
-- Room or Room Type changes
-- Optional additional prices change
+Pricing behavior:
+- Mandatory additional prices auto-applied
+- Optional prices selectable
+- Total recalculates automatically on any change
 
 Manual bookings:
-- Total amount is editable
+- Total editable
 
-Non-manual bookings:
-- Total amount is read-only
+Non-manual:
+- Total read-only
 
 ---
 
-## 10. Image Handling
+## 13. Image Handling
 
 - File upload only
-- No image URLs allowed
-- Convert all images to **webp**
-- Preserve image order
+- Convert to webp
+- Preserve order
 
 ---
 
-## 11. Authentication & Users
+## 14. Authentication & Users
 
 - Admin authentication required
 - Users table:
@@ -393,17 +370,8 @@ Non-manual bookings:
 
 ---
 
-## 12. UI & Interaction Rules
+## 15. UI & Interaction Rules
 
-- All clickable elements must use `cursor: pointer`
-- Disabled elements must be visually distinct
-- For any time-consuming action:
-  - Show loading indicator or loading screen
-  - Clearly communicate progress to the user
-
-Actions requiring loading feedback:
-- Save
-- Update
-- Pricing changes
-- Booking creation or modification
-- Drag & drop operations
+- All clickable elements use `cursor: pointer`
+- Disabled elements clearly styled
+- All async actions show loading indicator

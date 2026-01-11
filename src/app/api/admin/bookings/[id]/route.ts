@@ -216,6 +216,26 @@ export async function PUT(
       updateData.roomId = data.roomId
     }
 
+    // Handle additional prices update if provided
+    if (Array.isArray(data.additionalPrices)) {
+      // Delete existing additional prices
+      await prisma.bookingAdditionalPrice.deleteMany({
+        where: { bookingId: id },
+      })
+
+      // Create new additional prices
+      if (data.additionalPrices.length > 0) {
+        await prisma.bookingAdditionalPrice.createMany({
+          data: data.additionalPrices.map((price: { title: string; priceEur: number; quantity?: number }) => ({
+            bookingId: id,
+            title: price.title,
+            priceEur: price.priceEur,
+            quantity: price.quantity || 1,
+          })),
+        })
+      }
+    }
+
     const booking = await prisma.booking.update({
       where: { id },
       data: updateData,

@@ -9,6 +9,7 @@ export interface Building {
 export interface RoomType {
   id: string
   name: string
+  capacity: number
   rooms: Room[]
 }
 
@@ -35,7 +36,18 @@ export interface BookingAdditionalPrice {
 
 export type BookingSource = 'MANUAL' | 'WEBSITE' | 'BOOKING_COM' | 'SZALLAS_HU' | 'AIRBNB'
 export type BookingStatus = 'INCOMING' | 'CONFIRMED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED'
-export type PaymentStatus = 'PENDING' | 'DEPOSIT_PAID' | 'FULLY_PAID' | 'REFUNDED'
+export type PaymentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'FULLY_PAID' | 'REFUNDED'
+export type PaymentMethod = 'CASH' | 'TRANSFER'
+
+export interface Payment {
+  id: string
+  amount: number
+  method: PaymentMethod
+  date: string
+  note: string | null
+  bookingId: string
+  createdAt: string
+}
 
 export interface Booking {
   id: string
@@ -53,6 +65,7 @@ export interface Booking {
   roomId: string
   room: Room
   additionalPrices: BookingAdditionalPrice[]
+  payments: Payment[]
   nights?: number
 }
 
@@ -60,6 +73,7 @@ export interface AvailableRoom {
   room: Room
   building: string
   roomType: string
+  capacity: number
 }
 
 export interface PriceBreakdown {
@@ -110,11 +124,19 @@ export const SOURCE_COLORS = {
 }
 
 export const SOURCE_LABELS = {
-  MANUAL: 'Manual',
+  MANUAL: 'Direct',
   WEBSITE: 'Website',
   BOOKING_COM: 'Booking.com',
   SZALLAS_HU: 'Szállás.hu',
   AIRBNB: 'Airbnb',
+}
+
+export const SOURCE_ICONS = {
+  MANUAL: '/icons/MANUAL.png',
+  WEBSITE: '/icons/WEBSITE.webp',
+  BOOKING_COM: '/icons/BOOKING_COM.svg',
+  SZALLAS_HU: '/icons/SZALLAS_HU.webp',
+  AIRBNB: '/icons/AIRBNB.webp',
 }
 
 export const STATUS_COLORS = {
@@ -141,18 +163,43 @@ export const STATUS_ICONS = {
   CANCELLED: '✕',
 }
 
+// Status flow order (Cancelled is not part of the main flow)
+export const STATUS_FLOW: BookingStatus[] = ['INCOMING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT']
+
+// Get next status in the flow (returns null if at end or cancelled)
+export function getNextStatus(currentStatus: BookingStatus): BookingStatus | null {
+  if (currentStatus === 'CANCELLED') return null
+  const currentIndex = STATUS_FLOW.indexOf(currentStatus)
+  if (currentIndex === -1 || currentIndex >= STATUS_FLOW.length - 1) return null
+  return STATUS_FLOW[currentIndex + 1]
+}
+
+// Get action label for advancing to next status
+export const STATUS_ACTION_LABELS: Record<BookingStatus, string> = {
+  INCOMING: 'Confirm Booking',
+  CONFIRMED: 'Check In Guest',
+  CHECKED_IN: 'Check Out Guest',
+  CHECKED_OUT: '', // No next action
+  CANCELLED: '', // No next action
+}
+
 export const PAYMENT_LABELS = {
   PENDING: 'Pending',
-  DEPOSIT_PAID: 'Deposit Paid',
+  PARTIALLY_PAID: 'Partially Paid',
   FULLY_PAID: 'Fully Paid',
   REFUNDED: 'Refunded',
 }
 
 export const PAYMENT_COLORS = {
   PENDING: { bg: 'bg-stone-100', text: 'text-stone-700' },
-  DEPOSIT_PAID: { bg: 'bg-amber-100', text: 'text-amber-700' },
+  PARTIALLY_PAID: { bg: 'bg-amber-100', text: 'text-amber-700' },
   FULLY_PAID: { bg: 'bg-green-100', text: 'text-green-700' },
   REFUNDED: { bg: 'bg-red-100', text: 'text-red-700' },
+}
+
+export const PAYMENT_METHOD_LABELS = {
+  CASH: 'Cash',
+  TRANSFER: 'Bank Transfer',
 }
 
 // Default form values

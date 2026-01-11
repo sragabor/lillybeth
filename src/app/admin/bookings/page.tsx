@@ -39,6 +39,7 @@ export default function BookingsPage() {
                 room,
                 building: building.name,
                 roomType: roomType.name,
+                capacity: roomType.capacity,
               })
             })
           })

@@ -4,11 +4,15 @@ import {useState, useEffect, useCallback, Fragment} from 'react'
 import {
   Booking,
   AvailableRoom,
+  BookingStatus,
   SOURCE_COLORS,
   SOURCE_LABELS,
+  SOURCE_ICONS,
   STATUS_COLORS,
   STATUS_LABELS,
   STATUS_ICONS,
+  STATUS_ACTION_LABELS,
+  getNextStatus,
   PAYMENT_COLORS,
   PAYMENT_LABELS,
 } from '../types'
@@ -96,6 +100,9 @@ export default function BookingListView({
   // Modal state
   const [showModal, setShowModal] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+
+  // Inline status update state
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
 
   // List-only filters (internal state)
   const [startDate, setStartDate] = useState(externalStartDate || '')
@@ -197,6 +204,32 @@ export default function BookingListView({
   const handleEdit = (booking: Booking) => {
     setEditingBooking(booking)
     setShowModal(true)
+  }
+
+  // Handle inline status update
+  const handleStatusUpdate = async (bookingId: string, newStatus: BookingStatus) => {
+    setUpdatingStatusId(bookingId)
+    try {
+      const res = await fetch(`/api/admin/bookings/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (res.ok) {
+        fetchBookings()
+        if (expandedBookingId === bookingId) {
+          fetchBookingDetails(bookingId)
+        }
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to update status')
+      }
+    } catch (error) {
+      console.error('Error updating status:', error)
+    } finally {
+      setUpdatingStatusId(null)
+    }
   }
 
   // Handle filter changes
@@ -402,7 +435,7 @@ export default function BookingListView({
                         <td className="px-4 py-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${sourceColors.badge}`} />
+                              <img src={SOURCE_ICONS[booking.source]} alt={booking.source} className="w-4 h-4 object-contain" />
                               <span className={`font-medium text-stone-900 ${isCancelled ? 'line-through' : ''}`}>
                                 {booking.guestName}
                               </span>
@@ -459,36 +492,38 @@ export default function BookingListView({
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             {booking.notes && (
-                              <svg
-                                className="w-4 h-4 text-stone-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                title="Has notes"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                                />
-                              </svg>
+                              <span title="Has notes">
+                                <svg
+                                  className="w-4 h-4 text-stone-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                                  />
+                                </svg>
+                              </span>
                             )}
                             {booking.additionalPrices.length > 0 && (
-                              <svg
-                                className="w-4 h-4 text-amber-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                title="Has additional prices"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
+                              <span title="Has additional prices">
+                                <svg
+                                  className="w-4 h-4 text-amber-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </span>
                             )}
                           </div>
                         </td>
@@ -618,19 +653,62 @@ export default function BookingListView({
                                   </div>
                                 </div>
 
-                                {/* Actions */}
-                                <div className="flex flex-col items-end justify-between">
-                                  <div className="text-right text-sm">
-                                    <p className="text-stone-500">Booking ID</p>
-                                    <p className="font-mono text-stone-900">#{getShortId(booking.id)}</p>
-                                    <p className="text-stone-500 mt-2">Created</p>
-                                    <p className="text-stone-900">
-                                      {new Date(booking.checkIn).toLocaleDateString()}
+                                {/* Status & Payment Controls */}
+                                <div className="flex flex-col gap-4">
+                                  {/* Status Control */}
+                                  <div className="bg-white rounded-lg border border-stone-200 p-3">
+                                    <h4 className="font-medium text-stone-900 mb-2 text-sm">Status</h4>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
+                                        {STATUS_LABELS[booking.status]}
+                                      </span>
+                                    </div>
+                                    {!isCancelled && getNextStatus(booking.status) && (
+                                      <button
+                                        onClick={() => handleStatusUpdate(booking.id, getNextStatus(booking.status)!)}
+                                        disabled={updatingStatusId === booking.id}
+                                        className="w-full px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                                      >
+                                        {updatingStatusId === booking.id ? (
+                                          <>
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                                            Updating...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                                            </svg>
+                                            {STATUS_ACTION_LABELS[booking.status]}
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+                                    {booking.status === 'CHECKED_OUT' && (
+                                      <p className="text-xs text-emerald-600 text-center">Booking completed</p>
+                                    )}
+                                  </div>
+
+                                  {/* Payment Info */}
+                                  <div className="bg-white rounded-lg border border-stone-200 p-3">
+                                    <h4 className="font-medium text-stone-900 mb-2 text-sm">Payment</h4>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}>
+                                        {PAYMENT_LABELS[booking.paymentStatus]}
+                                      </span>
+                                      <span className="text-sm font-medium text-stone-900">
+                                        {booking.totalAmount?.toFixed(2) || '0.00'} €
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-stone-500">
+                                      Click Edit to manage payments
                                     </p>
                                   </div>
+
+                                  {/* Edit Button */}
                                   <button
                                     onClick={() => handleEdit(booking)}
-                                    className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+                                    className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer text-sm"
                                   >
                                     {isCancelled ? 'View Details' : 'Edit Booking'}
                                   </button>
