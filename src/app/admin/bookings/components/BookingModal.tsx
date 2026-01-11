@@ -495,6 +495,8 @@ export default function BookingModal({
   if (!isOpen) return null
 
   const isCancelled = editingBooking?.status === 'CANCELLED'
+  // Price editing is locked for CONFIRMED, CHECKED_IN, CHECKED_OUT, and CANCELLED statuses
+  const isPriceLocked = Boolean(editingBooking && ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'].includes(editingBooking.status))
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -681,14 +683,16 @@ export default function BookingModal({
               <div className="bg-stone-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-sm font-medium text-stone-700">Price Breakdown</label>
-                  <button
-                    type="button"
-                    onClick={() => calculatePrice()}
-                    disabled={calculatingPrice || !bookingForm.roomId || !bookingForm.checkIn || !bookingForm.checkOut}
-                    className="px-3 py-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm cursor-pointer"
-                  >
-                    {calculatingPrice ? 'Calculating...' : 'Recalculate'}
-                  </button>
+                  {!isPriceLocked && (
+                    <button
+                      type="button"
+                      onClick={() => calculatePrice()}
+                      disabled={calculatingPrice || !bookingForm.roomId || !bookingForm.checkIn || !bookingForm.checkOut}
+                      className="px-3 py-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm cursor-pointer"
+                    >
+                      {calculatingPrice ? 'Calculating...' : 'Recalculate'}
+                    </button>
+                  )}
                 </div>
 
                 {priceBreakdown ? (
@@ -732,15 +736,15 @@ export default function BookingModal({
                                   <label
                                     key={price.id}
                                     className={`flex items-center justify-between p-2 rounded ${
-                                      price.mandatory ? 'bg-amber-50' : 'hover:bg-white'
-                                    } cursor-pointer`}
+                                      price.mandatory ? 'bg-amber-50' : isPriceLocked ? '' : 'hover:bg-white'
+                                    } ${isPriceLocked ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
                                   >
                                     <div className="flex items-center gap-2">
                                       <input
                                         type="checkbox"
                                         checked={price.mandatory || selectedPriceIds.has(price.id)}
-                                        disabled={price.mandatory}
-                                        onChange={() => !price.mandatory && toggleAdditionalPrice(price.id)}
+                                        disabled={price.mandatory || isPriceLocked}
+                                        onChange={() => !price.mandatory && !isPriceLocked && toggleAdditionalPrice(price.id)}
                                         className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer disabled:cursor-not-allowed"
                                       />
                                       <span className="text-sm text-stone-700">
@@ -773,15 +777,15 @@ export default function BookingModal({
                                   <label
                                     key={price.id}
                                     className={`flex items-center justify-between p-2 rounded ${
-                                      price.mandatory ? 'bg-amber-50' : 'hover:bg-white'
-                                    } cursor-pointer`}
+                                      price.mandatory ? 'bg-amber-50' : isPriceLocked ? '' : 'hover:bg-white'
+                                    } ${isPriceLocked ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
                                   >
                                     <div className="flex items-center gap-2">
                                       <input
                                         type="checkbox"
                                         checked={price.mandatory || selectedPriceIds.has(price.id)}
-                                        disabled={price.mandatory}
-                                        onChange={() => !price.mandatory && toggleAdditionalPrice(price.id)}
+                                        disabled={price.mandatory || isPriceLocked}
+                                        onChange={() => !price.mandatory && !isPriceLocked && toggleAdditionalPrice(price.id)}
                                         className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer disabled:cursor-not-allowed"
                                       />
                                       <span className="text-sm text-stone-700">
@@ -856,11 +860,11 @@ export default function BookingModal({
                 onChange={(e) => setBookingForm({ ...bookingForm, totalAmount: e.target.value })}
                 placeholder="Enter amount"
                 required
-                disabled={isCancelled}
+                disabled={isCancelled || isPriceLocked}
                 className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white disabled:bg-stone-100 disabled:cursor-not-allowed text-lg font-semibold"
               />
               <p className="mt-1 text-xs text-stone-500">
-                Auto-filled from calculation. Override if needed.
+                {isPriceLocked ? 'Price is locked after booking is confirmed.' : 'Auto-filled from calculation. Override if needed.'}
               </p>
             </div>
 
