@@ -51,7 +51,7 @@ interface Room {
 
 interface RoomType {
   id: string
-  name: string
+  name: LocalizedText
   capacity: number
   images: BuildingImage[]
   rooms: Room[]
@@ -838,7 +838,7 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
                           )}
                         </div>
                         <div>
-                          <h4 className="font-medium text-stone-800">{roomType.name}</h4>
+                          <h4 className="font-medium text-stone-800">{getLocalizedText(roomType.name, language)}</h4>
                           <p className="text-sm text-stone-500">{roomType.capacity} adults • {roomType.rooms.length} rooms</p>
                         </div>
                       </div>

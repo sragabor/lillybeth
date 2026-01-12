@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Building, AvailableRoom } from './types'
 import { GlobalFilters, BookingListView, TimelineView } from './components'
+import { getLocalizedText } from '@/lib/i18n/utils'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 type ViewMode = 'timeline' | 'list'
 
 export default function BookingsPage() {
+  const { language } = useLanguage()
   const [viewMode, setViewMode] = useState<ViewMode>('timeline')
   const [buildings, setBuildings] = useState<Building[]>([])
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([])
@@ -38,7 +41,7 @@ export default function BookingsPage() {
               rooms.push({
                 room,
                 building: building.name,
-                roomType: roomType.name,
+                roomType: getLocalizedText(roomType.name, language),
                 capacity: roomType.capacity,
               })
             })
@@ -51,7 +54,7 @@ export default function BookingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [language])
 
   useEffect(() => {
     fetchBuildings()

@@ -9,7 +9,12 @@
       "Bash(curl:*)",
       "Bash(lsof:*)",
       "mcp__Neon__list_projects",
-      "mcp__Neon__run_sql"
+      "mcp__Neon__run_sql",
+      "Bash(source .env)",
+      "Bash(set -a)",
+      "Bash(source .env.local)",
+      "Bash(set +a)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

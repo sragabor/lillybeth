@@ -17,13 +17,16 @@ import {
   PAYMENT_LABELS,
 } from '../types'
 import BookingModal from './BookingModal'
+import { LocalizedText } from '@/lib/i18n'
+import { getLocalizedText } from '@/lib/i18n/utils'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 type Tab = 'all' | 'upcoming' | 'past'
 type SortField = 'guestName' | 'checkIn' | 'guestCount' | 'totalAmount'
 type SortOrder = 'asc' | 'desc'
 
 interface BookingListViewProps {
-  buildings: { id: string; name: string; roomTypes: { id: string; name: string; rooms: { id: string; name: string; isActive: boolean }[] }[] }[]
+  buildings: { id: string; name: string; roomTypes: { id: string; name: LocalizedText; rooms: { id: string; name: string; isActive: boolean }[] }[] }[]
   availableRooms: AvailableRoom[]
   // Filters from parent
   filterBuildingId?: string
@@ -76,6 +79,7 @@ export default function BookingListView({
   filterRoomId: externalRoomId,
   onFiltersChange,
 }: BookingListViewProps) {
+  const { language } = useLanguage()
   // State
   const [activeTab, setActiveTab] = useState<Tab>('upcoming')
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -249,7 +253,7 @@ export default function BookingListView({
     b.roomTypes.flatMap((rt) =>
       rt.rooms.map((r) => ({
         ...r,
-        roomTypeName: rt.name,
+        roomTypeName: getLocalizedText(rt.name, language),
         buildingName: b.name,
       }))
     )
@@ -445,7 +449,7 @@ export default function BookingListView({
                                 {booking.room.roomType?.building.name}
                               </span>
                               <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">
-                                {booking.room.roomType?.name}
+                                {booking.room.roomType?.name && getLocalizedText(booking.room.roomType.name, language)}
                               </span>
                               <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
                                 {booking.room.name}

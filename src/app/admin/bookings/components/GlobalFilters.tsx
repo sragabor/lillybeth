@@ -1,6 +1,8 @@
 'use client'
 
 import { Building, BookingSource, SOURCE_LABELS } from '../types'
+import { getLocalizedText } from '@/lib/i18n/utils'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 interface GlobalFiltersProps {
   buildings: Building[]
@@ -21,6 +23,7 @@ export default function GlobalFilters({
   onRoomTypeChange,
   onSourceChange,
 }: GlobalFiltersProps) {
+  const { language } = useLanguage()
   // Get room types for selected building
   const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId)
   const roomTypes = selectedBuilding?.roomTypes || []
@@ -64,7 +67,7 @@ export default function GlobalFilters({
           <option value="">All Room Types</option>
           {roomTypes.map((roomType) => (
             <option key={roomType.id} value={roomType.id}>
-              {roomType.name}
+              {getLocalizedText(roomType.name, language)}
             </option>
           ))}
         </select>

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { LocalizedText } from '@/lib/i18n'
+import { Prisma } from '@/generated/prisma'
 
 // GET all room types (grouped by building)
 export async function GET() {
@@ -17,7 +19,7 @@ export async function GET() {
       },
       orderBy: [
         { building: { name: 'asc' } },
-        { name: 'asc' },
+        { createdAt: 'asc' },
       ],
     })
 
@@ -36,7 +38,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const data = await request.json()
+    const data = await request.json() as {
+      buildingId: string
+      name: LocalizedText
+      capacity: number | string
+    }
 
     if (!data.buildingId) {
       return NextResponse.json({ error: 'Building ID is required' }, { status: 400 })
@@ -45,8 +51,8 @@ export async function POST(request: NextRequest) {
     const roomType = await prisma.roomType.create({
       data: {
         buildingId: data.buildingId,
-        name: data.name,
-        capacity: parseInt(data.capacity) || 2,
+        name: data.name as Prisma.InputJsonValue,
+        capacity: parseInt(String(data.capacity)) || 2,
       },
       include: {
         images: { orderBy: { order: 'asc' }, take: 1 },

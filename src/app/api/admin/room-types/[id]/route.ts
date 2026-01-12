@@ -58,7 +58,7 @@ export async function PUT(
 
   try {
     const data = await request.json() as {
-      name: string
+      name: LocalizedText
       capacity: number
       description?: LocalizedText
     }
@@ -66,7 +66,7 @@ export async function PUT(
     const roomType = await prisma.roomType.update({
       where: { id },
       data: {
-        name: data.name,
+        name: data.name as Prisma.InputJsonValue,
         capacity: parseInt(String(data.capacity)) || 2,
         description: data.description ? data.description as Prisma.InputJsonValue : Prisma.JsonNull,
       },

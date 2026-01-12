@@ -16,6 +16,8 @@ import {
   PAYMENT_COLORS,
 } from '../types'
 import BookingModal from './BookingModal'
+import { getLocalizedText } from '@/lib/i18n/utils'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 interface TimelineData {
   buildings: Building[]
@@ -57,6 +59,7 @@ export default function TimelineView({
   filterRoomTypeId,
   filterSource,
 }: TimelineViewProps) {
+  const { language } = useLanguage()
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(() => {
@@ -154,7 +157,7 @@ export default function TimelineView({
             rooms.push({
               room,
               building: building.name,
-              roomType: roomType.name,
+              roomType: getLocalizedText(roomType.name, language),
               capacity: roomType.capacity,
             })
           })
@@ -384,7 +387,7 @@ export default function TimelineView({
           rows.push({
             type: 'room',
             room,
-            roomTypeName: roomType.name,
+            roomTypeName: getLocalizedText(roomType.name, language),
             roomTypeId: roomType.id,
             buildingName: building.name,
           })
@@ -622,7 +625,7 @@ export default function TimelineView({
                     style={{ height: HEADER_ROW_HEIGHT }}
                   >
                     <p className="text-xs font-medium text-stone-600 truncate">
-                      {row.roomType.name}
+                      {getLocalizedText(row.roomType.name, language)}
                     </p>
                   </div>
                 )

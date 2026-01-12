@@ -1,5 +1,7 @@
 // Shared types for booking views
 
+import { LocalizedText } from '@/lib/i18n'
+
 export interface Building {
   id: string
   name: string
@@ -8,7 +10,7 @@ export interface Building {
 
 export interface RoomType {
   id: string
-  name: string
+  name: LocalizedText
   capacity: number
   rooms: Room[]
 }
@@ -19,7 +21,7 @@ export interface Room {
   isActive: boolean
   roomType?: {
     id: string
-    name: string
+    name: LocalizedText
     building: {
       id: string
       name: string

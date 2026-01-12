@@ -45,7 +45,7 @@ interface Room {
 
 interface RoomType {
   id: string
-  name: string
+  name: LocalizedText
   capacity: number
   description: LocalizedText | null
   building: {
@@ -70,10 +70,8 @@ export default function RoomTypeDetailPage({ params }: { params: Promise<{ id: s
   const [error, setError] = useState<string | null>(null)
 
   // Form states
-  const [generalForm, setGeneralForm] = useState({
-    name: '',
-    capacity: '2',
-  })
+  const [name, setName] = useState<LocalizedText>(createEmptyLocalizedText())
+  const [capacity, setCapacity] = useState('2')
   const [description, setDescription] = useState<LocalizedText>(createEmptyLocalizedText())
   const [amenityCategories, setAmenityCategories] = useState<{ name: LocalizedText; amenities: { name: LocalizedText }[] }[]>([])
   const [additionalPrices, setAdditionalPrices] = useState<{ title: LocalizedText; priceEur: number; mandatory: boolean; perNight: boolean }[]>([])
@@ -94,10 +92,8 @@ export default function RoomTypeDetailPage({ params }: { params: Promise<{ id: s
       if (data.roomType) {
         const rt = data.roomType as RoomType
         setRoomType(rt)
-        setGeneralForm({
-          name: rt.name || '',
-          capacity: rt.capacity?.toString() || '2',
-        })
+        setName(rt.name || createEmptyLocalizedText())
+        setCapacity(rt.capacity?.toString() || '2')
         setDescription(rt.description || createEmptyLocalizedText())
         setAmenityCategories(rt.amenityCategories.map((c) => ({
           name: c.name || createEmptyLocalizedText(),
@@ -131,7 +127,8 @@ export default function RoomTypeDetailPage({ params }: { params: Promise<{ id: s
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...generalForm,
+          name,
+          capacity,
           description,
         }),
       })
@@ -294,7 +291,7 @@ export default function RoomTypeDetailPage({ params }: { params: Promise<{ id: s
           </svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-stone-800">{roomType.name}</h1>
+          <h1 className="text-2xl font-semibold text-stone-800">{getLocalizedText(roomType.name, language)}</h1>
           <p className="text-stone-500">{roomType.building.name} • {roomType.capacity} adults</p>
         </div>
       </div>
@@ -328,22 +325,20 @@ export default function RoomTypeDetailPage({ params }: { params: Promise<{ id: s
         {/* General Tab */}
         {activeTab === 'general' && (
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">Name</label>
-              <input
-                type="text"
-                value={generalForm.name}
-                onChange={(e) => setGeneralForm({ ...generalForm, name: e.target.value })}
-                className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-              />
-            </div>
+            <MultilingualTextInput
+              label="Name"
+              value={name}
+              onChange={setName}
+              placeholder="Room type name"
+              required
+            />
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-2">Capacity (adults)</label>
               <input
                 type="number"
                 min="1"
-                value={generalForm.capacity}
-                onChange={(e) => setGeneralForm({ ...generalForm, capacity: e.target.value })}
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
                 className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
               />
             </div>

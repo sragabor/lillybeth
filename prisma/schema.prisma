@@ -98,7 +98,7 @@ model BuildingAdditionalPrice {
 
 model RoomType {
   id                String                    @id @default(cuid())
-  name              String
+  name              Json
   description       Json?
   capacity          Int
   buildingId        String

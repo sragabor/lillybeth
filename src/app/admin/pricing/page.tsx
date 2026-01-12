@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { LocalizedText } from '@/lib/i18n'
+import { getLocalizedText } from '@/lib/i18n/utils'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 interface RoomType {
   id: string
-  name: string
+  name: LocalizedText
   capacity: number
   building: {
     id: string
@@ -51,6 +54,7 @@ interface PricingData {
 }
 
 export default function PricingPage() {
+  const { language } = useLanguage()
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<string>('')
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
@@ -468,7 +472,7 @@ export default function PricingPage() {
             <optgroup key={buildingName} label={buildingName}>
               {types.map((rt) => (
                 <option key={rt.id} value={rt.id}>
-                  {rt.name} (Capacity: {rt.capacity})
+                  {getLocalizedText(rt.name, language)} (Capacity: {rt.capacity})
                 </option>
               ))}
             </optgroup>
@@ -482,7 +486,7 @@ export default function PricingPage() {
             <div className="mt-3 flex items-center gap-2 text-sm">
               <span className="text-stone-500">Editing prices for:</span>
               <span className="font-medium text-stone-800">
-                {selectedRoomType.building.name} → {selectedRoomType.name}
+                {selectedRoomType.building.name} → {getLocalizedText(selectedRoomType.name, language)}
               </span>
             </div>
           ) : null

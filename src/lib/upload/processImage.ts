@@ -1,8 +1,6 @@
 import sharp from 'sharp';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-import { UPLOAD_CONFIG, getPublicUrl } from './config';
+import { put, del } from '@vercel/blob';
+import { UPLOAD_CONFIG } from './config';
 
 interface ProcessedImage {
   url: string;
@@ -42,8 +40,8 @@ async function validateFileType(buffer: Buffer): Promise<string | null> {
   return null;
 }
 
-// Generate a unique filename
-function generateFilename(originalName: string, prefix?: string): string {
+// Generate a unique filename with path prefix for organization
+function generateFilename(originalName: string, directory: string, prefix?: string): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   const safeName = originalName
@@ -55,7 +53,13 @@ function generateFilename(originalName: string, prefix?: string): string {
   const baseName = safeName.replace(/\.[^.]+$/, '');
   const prefixStr = prefix ? `${prefix}-` : '';
 
-  return `${prefixStr}${baseName}-${timestamp}-${random}.webp`;
+  // Clean up directory path for blob storage
+  const cleanDirectory = directory
+    .replace(/^public\//, '')
+    .replace(/^\//, '')
+    .replace(/\/$/, '');
+
+  return `${cleanDirectory}/${prefixStr}${baseName}-${timestamp}-${random}.webp`;
 }
 
 export async function processImage(options: ProcessImageOptions): Promise<ProcessedImage> {
@@ -76,15 +80,8 @@ export async function processImage(options: ProcessImageOptions): Promise<Proces
     throw new Error('Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.');
   }
 
-  // Ensure directory exists
-  const fullDirectory = path.join(process.cwd(), directory);
-  if (!existsSync(fullDirectory)) {
-    await mkdir(fullDirectory, { recursive: true });
-  }
-
-  // Generate filename
-  const filename = generateFilename(file.name, prefix);
-  const filePath = path.join(fullDirectory, filename);
+  // Generate filename with path
+  const filename = generateFilename(file.name, directory, prefix);
 
   // Process image with sharp
   let sharpInstance = sharp(buffer);
@@ -115,15 +112,15 @@ export async function processImage(options: ProcessImageOptions): Promise<Proces
   // Get final dimensions
   const finalMetadata = await sharp(webpBuffer).metadata();
 
-  // Write file
-  await writeFile(filePath, webpBuffer);
-
-  // Generate public URL
-  const url = getPublicUrl(path.join(directory, filename));
+  // Upload to Vercel Blob
+  const blob = await put(filename, webpBuffer, {
+    access: 'public',
+    contentType: 'image/webp',
+  });
 
   return {
-    url,
-    filename,
+    url: blob.url,
+    filename: filename.split('/').pop() || filename,
     originalName: file.name,
     width: finalMetadata.width || 0,
     height: finalMetadata.height || 0,
@@ -132,12 +129,20 @@ export async function processImage(options: ProcessImageOptions): Promise<Proces
 }
 
 export async function deleteImage(url: string): Promise<void> {
-  const { unlink } = await import('fs/promises');
-  const storagePath = path.join(process.cwd(), 'public', url);
-
   try {
-    if (existsSync(storagePath)) {
-      await unlink(storagePath);
+    // Only delete if it's a Vercel Blob URL
+    if (url.includes('.blob.vercel-storage.com') || url.includes('.public.blob.vercel-storage.com')) {
+      await del(url);
+    } else {
+      // Legacy: Handle local file deletion for existing images
+      const { unlink } = await import('fs/promises');
+      const { existsSync } = await import('fs');
+      const path = await import('path');
+      const storagePath = path.join(process.cwd(), 'public', url);
+
+      if (existsSync(storagePath)) {
+        await unlink(storagePath);
+      }
     }
   } catch (error) {
     console.error('Failed to delete image:', error);
