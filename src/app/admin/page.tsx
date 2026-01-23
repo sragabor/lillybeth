@@ -18,6 +18,14 @@ export default async function AdminDashboard() {
     incomingBookings: 0,
   }
 
+  // Summary statistics
+  let summaryStats = {
+    totalBookings: 0,
+    openBookings: 0,
+    unpaidBookings: 0,
+    currentlyStayingGuests: 0,
+  }
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today)
@@ -28,6 +36,10 @@ export default async function AdminDashboard() {
       todayCheckIns,
       todayCheckOuts,
       incomingBookings,
+      totalBookings,
+      openBookings,
+      unpaidBookings,
+      currentlyStayingBookings,
     ] = await Promise.all([
       prisma.booking.count({
         where: {
@@ -46,11 +58,45 @@ export default async function AdminDashboard() {
           status: 'INCOMING',
         },
       }),
+      // Total bookings (excluding cancelled)
+      prisma.booking.count({
+        where: {
+          status: { not: 'CANCELLED' },
+        },
+      }),
+      // Open/not completed bookings (INCOMING, CONFIRMED, or CHECKED_IN)
+      prisma.booking.count({
+        where: {
+          status: { in: ['INCOMING', 'CONFIRMED', 'CHECKED_IN'] },
+        },
+      }),
+      // Unpaid bookings (payment status is not FULLY_PAID, excluding cancelled)
+      prisma.booking.count({
+        where: {
+          status: { not: 'CANCELLED' },
+          paymentStatus: { not: 'FULLY_PAID' },
+        },
+      }),
+      // Currently staying guests (checkIn <= today < checkOut AND status is CHECKED_IN)
+      prisma.booking.aggregate({
+        _sum: { guestCount: true },
+        where: {
+          checkIn: { lte: today },
+          checkOut: { gt: today },
+          status: 'CHECKED_IN',
+        },
+      }),
     ])
     stats = {
       todayCheckIns,
       todayCheckOuts,
       incomingBookings,
+    }
+    summaryStats = {
+      totalBookings,
+      openBookings,
+      unpaidBookings,
+      currentlyStayingGuests: currentlyStayingBookings._sum.guestCount || 0,
     }
   } catch {
     // Database might not be connected yet
@@ -87,10 +133,41 @@ export default async function AdminDashboard() {
         </div>
       )}
 
-      {/* Quick Actions */}
+      {/* Quick Actions & Statistics */}
       <div className="mb-8">
         <h2 className="text-lg font-medium text-stone-800 mb-4">Quick Actions</h2>
-        <DashboardActions />
+        <div className="flex flex-wrap items-start gap-6">
+          <DashboardActions />
+
+          {/* Summary Statistics */}
+          <div className="flex flex-wrap gap-3">
+            {/* Total Bookings */}
+            <div className="px-4 py-3 bg-white border border-stone-200 rounded-xl shadow-sm min-w-[120px]">
+              <p className="text-2xl font-semibold text-stone-900">{summaryStats.totalBookings}</p>
+              <p className="text-xs text-stone-500">Total Bookings</p>
+            </div>
+
+            {/* Open Bookings */}
+            <div className="px-4 py-3 bg-white border border-stone-200 rounded-xl shadow-sm min-w-[120px]">
+              <p className="text-2xl font-semibold text-amber-600">{summaryStats.openBookings}</p>
+              <p className="text-xs text-stone-500">Open Bookings</p>
+            </div>
+
+            {/* Unpaid Bookings */}
+            <div className="px-4 py-3 bg-white border border-stone-200 rounded-xl shadow-sm min-w-[120px]">
+              <p className={`text-2xl font-semibold ${summaryStats.unpaidBookings > 0 ? 'text-red-600' : 'text-stone-900'}`}>
+                {summaryStats.unpaidBookings}
+              </p>
+              <p className="text-xs text-stone-500">Unpaid</p>
+            </div>
+
+            {/* Currently Staying */}
+            <div className="px-4 py-3 bg-white border border-stone-200 rounded-xl shadow-sm min-w-[120px]">
+              <p className="text-2xl font-semibold text-green-600">{summaryStats.currentlyStayingGuests}</p>
+              <p className="text-xs text-stone-500">Guests Staying</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Calendar Overview */}

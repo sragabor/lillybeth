@@ -7,9 +7,9 @@ This project is an **admin system for managing accommodations**, connected to a 
 The public website:
 - Displays accommodation, room types, and rooms
 - Supports **3 languages**:
-  - English (EN)
-  - Hungarian (HU)
-  - German (DE)
+    - English (EN)
+    - Hungarian (HU)
+    - German (DE)
 - Allows booking by **room type**
 
 The admin interface:
@@ -26,8 +26,8 @@ Tech stack:
 - **Prisma ORM** (already configured, compatible with Vercel)
 - Database must run locally and on **Vercel**
 - Image uploads must use **Vercel Blob or Cloudinary**
-  - Claude must choose the better option
-  - If registration is required, Claude must explicitly notify
+    - Claude must choose the better option
+    - If registration is required, Claude must explicitly notify
 - All images stored as **webp**
 
 ---
@@ -48,9 +48,9 @@ Language-dependent fields include (but are not limited to):
 - House Rules labels and values
 - Amenities names and categories
 - Booking Conditions:
-  - Cancellation Policy
-  - Payment Methods
-  - Deposit
+    - Cancellation Policy
+    - Payment Methods
+    - Deposit
 - Special Day names
 
 The data model must support structured multilingual storage.
@@ -125,8 +125,8 @@ Admins can define pricing rules by date range:
 Rules:
 - Date ranges **must NOT overlap**
 - Inactive ranges:
-  - Make all days unbookable
-  - Override any price values
+    - Make all days unbookable
+    - Override any price values
 
 ---
 
@@ -134,7 +134,7 @@ Rules:
 
 Calendar must:
 - Display full hierarchy context:
-  - `Building → Room Type → Room`
+    - `Building → Room Type → Room`
 - Never hide room names
 
 Calendar cells:
@@ -157,8 +157,8 @@ Features:
 - Name (multilingual)
 - Date range (start – end)
 - Visual style:
-  - Light blue background
-  - Badge with star icon and event name
+    - Light blue background
+    - Badge with star icon and event name
 
 Displayed in:
 - Calendar view
@@ -192,8 +192,8 @@ Icons are loaded from `/public/icons`.
 
 Layout hierarchy:
 - Building
-  - Room Type
-    - Room (only rooms are interactive)
+    - Room Type
+        - Room (only rooms are interactive)
 
 UI rules:
 - Inactive rooms → disabled rows
@@ -210,8 +210,8 @@ UI rules:
 - No drag & drop
 - No booking editing
 - Two actions only:
-  - Create Booking
-  - Create Special Day
+    - Create Booking
+    - Create Special Day
 
 ---
 
@@ -226,12 +226,12 @@ Features:
 - Pagination
 - Sorting
 - Filtering by:
-  - Building
-  - Room Type
-  - Room
-  - Guest name
-  - Source
-  - Date range
+    - Building
+    - Room Type
+    - Room
+    - Guest name
+    - Source
+    - Date range
 
 Expanded row:
 - Shows full booking details
@@ -255,27 +255,27 @@ This applies to:
 
 1. Base room price per night × number of nights
 2. Mandatory additional prices:
-  - Per booking
-  - Per night
+    - Per booking
+    - Per night
 3. Optional additional prices:
-  - Only if selected
-  - Persist across edits and drag & drop
+    - Only if selected
+    - Persist across edits and drag & drop
 4. Target context:
-  - Building-level additional prices
-  - Room Type–level additional prices
+    - Building-level additional prices
+    - Room Type–level additional prices
 
 ### Drag & Drop Pricing Rules
 
 When a booking is moved:
 - Previously selected optional additional prices must:
-  - Remain selected if they exist in the target context
+    - Remain selected if they exist in the target context
 - Mandatory additional prices of the target context must be applied
 - Total price must be recalculated using the unified pricing logic
 
 After drag & drop:
 - Edit Booking modal must:
-  - Show selected optional additional prices as checked
-  - Display correct price breakdown and final total
+    - Show selected optional additional prices as checked
+    - Display correct price breakdown and final total
 
 ---
 
