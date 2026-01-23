@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
 
     // Selected optional price IDs from the request
     const selectedPriceIds: string[] = data.selectedPriceIds || []
+    // Selected optional price titles (for matching by title, used in drag & drop)
+    const selectedPriceTitles: string[] = data.selectedPriceTitles || []
 
     // Get room with room type and building
     const room = await prisma.room.findUnique({
@@ -184,8 +186,10 @@ export async function POST(request: NextRequest) {
     let additionalTotal = 0
 
     for (const priceOption of availableAdditionalPrices) {
-      // Include if mandatory OR if selected
-      if (priceOption.mandatory || selectedPriceIds.includes(priceOption.id)) {
+      // Include if mandatory OR if selected by ID OR if selected by title match
+      const isSelectedById = selectedPriceIds.includes(priceOption.id)
+      const isSelectedByTitle = selectedPriceTitles.includes(priceOption.title)
+      if (priceOption.mandatory || isSelectedById || isSelectedByTitle) {
         const quantity = priceOption.perNight ? nights : 1
         const total = priceOption.priceEur * quantity
 

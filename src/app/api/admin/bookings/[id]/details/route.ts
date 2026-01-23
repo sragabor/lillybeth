@@ -88,7 +88,8 @@ export async function GET(
     while (current < checkOut) {
       const dateStr = current.toISOString().split('T')[0]
       const dayOfWeek = current.getDay()
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+      // Weekend = Friday (5) or Saturday (6) nights - consistent with calculate-price API
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6
       const dayName = current.toLocaleDateString('en-US', { weekday: 'short' })
 
       // Check for calendar override first

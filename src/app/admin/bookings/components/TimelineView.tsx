@@ -145,6 +145,7 @@ export default function TimelineView({
     newCheckOut: string
     oldPrice: number | null
     newPrice: number | null
+    newAdditionalPrices: { title: string; priceEur: number; quantity: number }[]
   } | null>(null)
 
   const endDate = useCallback(() => {
@@ -330,6 +331,9 @@ export default function TimelineView({
     const newCheckInStr = newCheckIn.toISOString().split('T')[0]
     const newCheckOutStr = newCheckOut.toISOString().split('T')[0]
 
+    // Extract existing additional price titles to preserve selections
+    const selectedPriceTitles = draggingBooking.additionalPrices.map(p => p.title)
+
     try {
       const res = await fetch('/api/admin/bookings/calculate-price', {
         method: 'POST',
@@ -338,6 +342,7 @@ export default function TimelineView({
           roomId,
           checkIn: newCheckInStr,
           checkOut: newCheckOutStr,
+          selectedPriceTitles,
         }),
       })
 
@@ -345,6 +350,14 @@ export default function TimelineView({
         const data = await res.json()
         const newPrice = data.breakdown.grandTotal
         const oldPrice = draggingBooking.totalAmount
+        // Extract the calculated additional prices for the new context
+        const newAdditionalPrices = data.breakdown.additionalPrices.map(
+          (p: { title: string; priceEur: number; quantity: number }) => ({
+            title: p.title,
+            priceEur: p.priceEur,
+            quantity: p.quantity,
+          })
+        )
 
         if (oldPrice !== null && Math.abs(newPrice - oldPrice) > 0.01) {
           setPendingDrop({
@@ -354,6 +367,7 @@ export default function TimelineView({
             newCheckOut: newCheckOutStr,
             oldPrice,
             newPrice,
+            newAdditionalPrices,
           })
           setShowDragWarningModal(true)
           setDraggingBooking(null)
@@ -361,6 +375,10 @@ export default function TimelineView({
           setDragOverDate(null)
           return
         }
+
+        // No price change, but still update with recalculated additional prices
+        await executeDrop(draggingBooking.id, roomId, newCheckInStr, newCheckOutStr, undefined, newAdditionalPrices)
+        return
       }
     } catch (error) {
       console.error('Error checking new price:', error)
@@ -369,7 +387,14 @@ export default function TimelineView({
     await executeDrop(draggingBooking.id, roomId, newCheckInStr, newCheckOutStr)
   }
 
-  const executeDrop = async (bookingId: string, roomId: string, checkIn: string, checkOut: string, newPrice?: number) => {
+  const executeDrop = async (
+    bookingId: string,
+    roomId: string,
+    checkIn: string,
+    checkOut: string,
+    newPrice?: number,
+    additionalPrices?: { title: string; priceEur: number; quantity: number }[]
+  ) => {
     try {
       const updateData: Record<string, unknown> = {
         roomId,
@@ -379,6 +404,11 @@ export default function TimelineView({
 
       if (newPrice !== undefined) {
         updateData.totalAmount = newPrice.toString()
+      }
+
+      // Include recalculated additional prices if provided
+      if (additionalPrices !== undefined) {
+        updateData.additionalPrices = additionalPrices
       }
 
       const res = await fetch(`/api/admin/bookings/${bookingId}`, {
@@ -411,7 +441,8 @@ export default function TimelineView({
       pendingDrop.roomId,
       pendingDrop.newCheckIn,
       pendingDrop.newCheckOut,
-      updatePrice ? pendingDrop.newPrice ?? undefined : undefined
+      updatePrice ? pendingDrop.newPrice ?? undefined : undefined,
+      pendingDrop.newAdditionalPrices
     )
   }
 
