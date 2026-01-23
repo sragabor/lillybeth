@@ -1,26 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Building, AvailableRoom } from './types'
-import { GlobalFilters, BookingListView } from './components'
-import { getLocalizedText } from '@/lib/i18n/utils'
-import { useLanguage } from '@/contexts/LanguageContext'
+import { Building } from '../bookings/types'
+import { GlobalFilters, TimelineView } from '../bookings/components'
 
-export default function BookingsPage() {
-  const { language } = useLanguage()
+export default function CalendarPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
-  const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([])
   const [loading, setLoading] = useState(true)
 
   // Global filters
   const [filterBuildingId, setFilterBuildingId] = useState('')
   const [filterRoomTypeId, setFilterRoomTypeId] = useState('')
   const [filterSource, setFilterSource] = useState('')
-
-  // List filters
-  const [listFilterStartDate, setListFilterStartDate] = useState('')
-  const [listFilterEndDate, setListFilterEndDate] = useState('')
-  const [listFilterRoomId, setListFilterRoomId] = useState('')
 
   // Fetch buildings for filters
   const fetchBuildings = useCallback(async () => {
@@ -29,40 +20,17 @@ export default function BookingsPage() {
       if (res.ok) {
         const data = await res.json()
         setBuildings(data.buildings || [])
-
-        // Build available rooms list
-        const rooms: AvailableRoom[] = []
-        data.buildings?.forEach((building: Building) => {
-          building.roomTypes?.forEach((roomType) => {
-            roomType.rooms?.forEach((room) => {
-              rooms.push({
-                room,
-                building: building.name,
-                roomType: getLocalizedText(roomType.name, language),
-                capacity: roomType.capacity,
-              })
-            })
-          })
-        })
-        setAvailableRooms(rooms)
       }
     } catch (error) {
       console.error('Error fetching buildings:', error)
     } finally {
       setLoading(false)
     }
-  }, [language])
+  }, [])
 
   useEffect(() => {
     fetchBuildings()
   }, [fetchBuildings])
-
-  // Handle list filter changes
-  const handleListFiltersChange = (filters: { startDate: string; endDate: string; roomId: string }) => {
-    setListFilterStartDate(filters.startDate)
-    setListFilterEndDate(filters.endDate)
-    setListFilterRoomId(filters.roomId)
-  }
 
   if (loading) {
     return (
@@ -78,8 +46,8 @@ export default function BookingsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-semibold text-stone-900">Bookings</h1>
-          <p className="text-stone-600 mt-1">Search & filter bookings</p>
+          <h1 className="text-2xl font-semibold text-stone-900">Calendar</h1>
+          <p className="text-stone-600 mt-1">Timeline view - drag & drop to reschedule</p>
         </div>
       </div>
 
@@ -96,18 +64,12 @@ export default function BookingsPage() {
         />
       </div>
 
-      {/* List View */}
+      {/* Timeline View */}
       <div className="flex-1 min-h-0">
-        <BookingListView
-          buildings={buildings}
-          availableRooms={availableRooms}
+        <TimelineView
           filterBuildingId={filterBuildingId}
           filterRoomTypeId={filterRoomTypeId}
           filterSource={filterSource}
-          filterStartDate={listFilterStartDate}
-          filterEndDate={listFilterEndDate}
-          filterRoomId={listFilterRoomId}
-          onFiltersChange={handleListFiltersChange}
         />
       </div>
     </div>

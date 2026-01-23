@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
-import { PaymentMethod, PaymentStatus } from '@/generated/prisma'
+import { PaymentMethod, PaymentStatus, PaymentCurrency } from '@/generated/prisma'
 
 // Helper function to calculate payment status based on payments vs total amount
 function calculatePaymentStatus(totalPaid: number, totalAmount: number | null): PaymentStatus {
@@ -89,8 +89,14 @@ export async function POST(
     }
 
     // Validate payment method
-    if (!data.method || !['CASH', 'TRANSFER'].includes(data.method)) {
+    if (!data.method || !['CASH', 'TRANSFER', 'CREDIT_CARD'].includes(data.method)) {
       return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
+    }
+
+    // Validate currency (default to EUR if not provided)
+    const currency = data.currency || 'EUR'
+    if (!['EUR', 'HUF'].includes(currency)) {
+      return NextResponse.json({ error: 'Invalid currency' }, { status: 400 })
     }
 
     // Validate date
@@ -118,6 +124,7 @@ export async function POST(
     const payment = await prisma.payment.create({
       data: {
         amount,
+        currency: currency as PaymentCurrency,
         method: data.method as PaymentMethod,
         date: paymentDate,
         note: data.note || null,

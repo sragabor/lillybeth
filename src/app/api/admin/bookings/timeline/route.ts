@@ -166,6 +166,32 @@ export async function GET(request: NextRequest) {
       inactiveDaysByRoomType = {}
     }
 
+    // Fetch special days for the date range (now supports date ranges)
+    let specialDays: Record<string, string> = {}
+    try {
+      const specialDaysList = await prisma.specialDay.findMany({
+        where: {
+          // Find special days that overlap with the requested range
+          AND: [
+            { startDate: { lte: end } },
+            { endDate: { gte: start } },
+          ],
+        },
+      })
+      // Expand each special day's date range into individual dates
+      specialDaysList.forEach((day) => {
+        const rangeStart = day.startDate > start ? day.startDate : start
+        const rangeEnd = day.endDate < end ? day.endDate : end
+        const dates = getDatesInRange(rangeStart, rangeEnd)
+        dates.forEach((dateStr) => {
+          specialDays[dateStr] = day.name
+        })
+      })
+    } catch (specialDaysError) {
+      console.error('Error fetching special days (non-critical):', specialDaysError)
+      specialDays = {}
+    }
+
     // Group bookings by room ID for easy lookup
     const bookingsByRoom: Record<string, typeof bookings> = {}
     bookings.forEach((booking) => {
@@ -181,6 +207,7 @@ export async function GET(request: NextRequest) {
       bookingsByRoom,
       roomToRoomType,
       inactiveDaysByRoomType,
+      specialDays,
       dateRange: { start: startDate, end: endDate },
     })
   } catch (error) {

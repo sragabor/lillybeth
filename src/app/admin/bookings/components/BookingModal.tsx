@@ -9,6 +9,7 @@ import {
   PriceBreakdown,
   Payment,
   PaymentMethod,
+  PaymentCurrency,
   DEFAULT_BOOKING_FORM,
   STATUS_LABELS,
   STATUS_COLORS,
@@ -61,6 +62,7 @@ export default function BookingModal({
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
+    currency: 'EUR' as PaymentCurrency,
     method: 'CASH' as PaymentMethod,
     date: new Date().toISOString().split('T')[0],
     note: '',
@@ -74,6 +76,11 @@ export default function BookingModal({
   const [showDeleteBookingConfirm, setShowDeleteBookingConfirm] = useState(false)
   const [showDeletePaymentConfirm, setShowDeletePaymentConfirm] = useState(false)
   const [pendingDeletePaymentId, setPendingDeletePaymentId] = useState<string | null>(null)
+
+  // Status tracking checkboxes
+  const [invoiceSent, setInvoiceSent] = useState(false)
+  const [vendegem, setVendegem] = useState(false)
+  const [cleaned, setCleaned] = useState(false)
 
   // Load price breakdown for edit mode and match existing additional prices by title
   const loadEditModePrice = async (
@@ -152,6 +159,7 @@ export default function BookingModal({
           guestCount: editingBooking.guestCount.toString(),
           checkIn,
           checkOut,
+          arrivalTime: editingBooking.arrivalTime || '',
           status: editingBooking.status,
           paymentStatus: editingBooking.paymentStatus,
           notes: editingBooking.notes || '',
@@ -168,11 +176,21 @@ export default function BookingModal({
 
         // Load payments for this booking
         loadPayments(editingBooking.id)
+
+        // Initialize status checkboxes
+        setInvoiceSent(editingBooking.invoiceSent || false)
+        setVendegem(editingBooking.vendegem || false)
+        setCleaned(editingBooking.cleaned || false)
       } else {
         // Reset payment state for new bookings
         setPayments([])
         setPaymentSummary(null)
         setShowPaymentForm(false)
+
+        // Reset status checkboxes
+        setInvoiceSent(false)
+        setVendegem(false)
+        setCleaned(false)
         // Create mode
         setSelectedPriceIds(new Set())
         setBookingForm({
@@ -295,6 +313,10 @@ export default function BookingModal({
         body: JSON.stringify({
           ...bookingForm,
           additionalPrices: additionalPricesData,
+          // Status tracking checkboxes
+          invoiceSent,
+          vendegem,
+          cleaned,
         }),
       })
 
@@ -441,6 +463,7 @@ export default function BookingModal({
         // Reset form
         setPaymentForm({
           amount: '',
+          currency: 'EUR',
           method: 'CASH',
           date: new Date().toISOString().split('T')[0],
           note: '',
@@ -661,6 +684,21 @@ export default function BookingModal({
               </div>
             </div>
 
+            {/* Arrival Time */}
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1">
+                Arrival Time
+              </label>
+              <input
+                type="time"
+                value={bookingForm.arrivalTime}
+                onChange={(e) => setBookingForm({ ...bookingForm, arrivalTime: e.target.value })}
+                disabled={isCancelled}
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer disabled:bg-stone-100 disabled:cursor-not-allowed"
+              />
+              <p className="mt-1 text-xs text-stone-500">Expected arrival time (optional)</p>
+            </div>
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
@@ -672,6 +710,62 @@ export default function BookingModal({
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none disabled:bg-stone-100 disabled:cursor-not-allowed"
               />
             </div>
+
+            {/* Status Tracking Checkboxes - Only show in edit mode */}
+            {editingBooking && (
+              <div className="pt-4 border-t border-stone-200">
+                <label className="block text-sm font-medium text-stone-700 mb-3">Status Tracking</label>
+                {(() => {
+                  // Checkboxes are disabled when status is CHECKED_OUT and checkout date is in the past
+                  const isCheckedOut = editingBooking.status === 'CHECKED_OUT'
+                  const checkoutDate = new Date(editingBooking.checkOut)
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const isCheckoutPast = checkoutDate < today
+                  const areCheckboxesLocked = isCheckedOut && isCheckoutPast
+
+                  return (
+                    <div className="space-y-2">
+                      <label className={`flex items-center gap-2 ${areCheckboxesLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={invoiceSent}
+                          onChange={(e) => setInvoiceSent(e.target.checked)}
+                          disabled={areCheckboxesLocked}
+                          className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed"
+                        />
+                        <span className="text-sm text-stone-700">Invoice</span>
+                      </label>
+                      <label className={`flex items-center gap-2 ${areCheckboxesLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={vendegem}
+                          onChange={(e) => setVendegem(e.target.checked)}
+                          disabled={areCheckboxesLocked}
+                          className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed"
+                        />
+                        <span className="text-sm text-stone-700">Vendégem</span>
+                      </label>
+                      <label className={`flex items-center gap-2 ${areCheckboxesLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={cleaned}
+                          onChange={(e) => setCleaned(e.target.checked)}
+                          disabled={areCheckboxesLocked}
+                          className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed"
+                        />
+                        <span className="text-sm text-stone-700">Cleaned</span>
+                      </label>
+                      {areCheckboxesLocked && (
+                        <p className="text-xs text-stone-500 mt-2">
+                          These options are locked for past checked-out bookings.
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Right Column - Price & Status */}
@@ -868,6 +962,33 @@ export default function BookingModal({
               </p>
             </div>
 
+            {/* Payment Status Select */}
+            {editingBooking && (
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Payment Status
+                </label>
+                <select
+                  value={bookingForm.paymentStatus}
+                  onChange={(e) => setBookingForm({ ...bookingForm, paymentStatus: e.target.value as BookingFormData['paymentStatus'] })}
+                  disabled={isCancelled}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer disabled:bg-stone-100 disabled:cursor-not-allowed ${
+                    PAYMENT_COLORS[bookingForm.paymentStatus as keyof typeof PAYMENT_COLORS]?.bg || 'bg-white'
+                  } ${
+                    PAYMENT_COLORS[bookingForm.paymentStatus as keyof typeof PAYMENT_COLORS]?.text || 'text-stone-900'
+                  } border-stone-300`}
+                >
+                  <option value="PENDING">Pending</option>
+                  <option value="PARTIALLY_PAID">Partially Paid</option>
+                  <option value="FULLY_PAID">Fully Paid</option>
+                  <option value="REFUNDED">Refunded</option>
+                </select>
+                <p className="mt-1 text-xs text-stone-500">
+                  Manually adjust payment status if needed. This is updated automatically when payments are recorded.
+                </p>
+              </div>
+            )}
+
             {/* Status Controls */}
             {editingBooking && (
               <div className="bg-white border border-stone-200 rounded-lg p-4">
@@ -977,7 +1098,7 @@ export default function BookingModal({
                       <div key={payment.id} className="flex items-center justify-between bg-white border border-stone-200 rounded-lg p-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{payment.amount.toFixed(2)} EUR</span>
+                            <span className="font-medium text-sm">{payment.amount.toFixed(2)} {payment.currency}</span>
                             <span className="text-xs px-2 py-0.5 rounded bg-stone-100 text-stone-600">
                               {PAYMENT_METHOD_LABELS[payment.method]}
                             </span>
@@ -1012,9 +1133,9 @@ export default function BookingModal({
                   <>
                     {showPaymentForm ? (
                       <div className="border border-stone-200 rounded-lg p-3 bg-stone-50 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <label className="block text-xs font-medium text-stone-600 mb-1">Amount (EUR)</label>
+                            <label className="block text-xs font-medium text-stone-600 mb-1">Amount</label>
                             <input
                               type="number"
                               step="0.01"
@@ -1026,6 +1147,17 @@ export default function BookingModal({
                             />
                           </div>
                           <div>
+                            <label className="block text-xs font-medium text-stone-600 mb-1">Currency</label>
+                            <select
+                              value={paymentForm.currency}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value as PaymentCurrency })}
+                              className="w-full px-2 py-1.5 border border-stone-300 rounded focus:ring-1 focus:ring-amber-500 text-sm cursor-pointer"
+                            >
+                              <option value="EUR">EUR</option>
+                              <option value="HUF">HUF</option>
+                            </select>
+                          </div>
+                          <div>
                             <label className="block text-xs font-medium text-stone-600 mb-1">Method</label>
                             <select
                               value={paymentForm.method}
@@ -1034,6 +1166,7 @@ export default function BookingModal({
                             >
                               <option value="CASH">Cash</option>
                               <option value="TRANSFER">Bank Transfer</option>
+                              <option value="CREDIT_CARD">Credit Card</option>
                             </select>
                           </div>
                         </div>

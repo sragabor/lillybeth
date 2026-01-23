@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   const source = searchParams.get('source')
   const startDate = searchParams.get('startDate')
   const endDate = searchParams.get('endDate')
+  const guestName = searchParams.get('guestName')
 
   try {
     const today = new Date()
@@ -72,6 +73,14 @@ export async function GET(request: NextRequest) {
     // Source filter
     if (source) {
       where.source = source
+    }
+
+    // Guest name search (case-insensitive)
+    if (guestName) {
+      where.guestName = {
+        contains: guestName,
+        mode: 'insensitive',
+      }
     }
 
     // Date range filter (overlapping bookings)

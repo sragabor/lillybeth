@@ -112,6 +112,7 @@ export default function BookingListView({
   const [startDate, setStartDate] = useState(externalStartDate || '')
   const [endDate, setEndDate] = useState(externalEndDate || '')
   const [roomId, setRoomId] = useState(externalRoomId || '')
+  const [guestNameSearch, setGuestNameSearch] = useState('')
 
   // Sync external filters
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function BookingListView({
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
       if (roomId) params.set('roomId', roomId)
+      if (guestNameSearch) params.set('guestName', guestNameSearch)
 
       const res = await fetch(`/api/admin/bookings/list?${params}`)
       if (res.ok) {
@@ -150,7 +152,7 @@ export default function BookingListView({
     } finally {
       setLoading(false)
     }
-  }, [activeTab, pagination.page, pagination.limit, sortBy, sortOrder, filterBuildingId, filterRoomTypeId, filterSource, startDate, endDate, roomId])
+  }, [activeTab, pagination.page, pagination.limit, sortBy, sortOrder, filterBuildingId, filterRoomTypeId, filterSource, startDate, endDate, roomId, guestNameSearch])
 
   useEffect(() => {
     fetchBookings()
@@ -159,7 +161,7 @@ export default function BookingListView({
   // Reset page when filters/tab change
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }))
-  }, [activeTab, filterBuildingId, filterRoomTypeId, filterSource, startDate, endDate, roomId])
+  }, [activeTab, filterBuildingId, filterRoomTypeId, filterSource, startDate, endDate, roomId, guestNameSearch])
 
   // Fetch expanded booking details
   const fetchBookingDetails = async (bookingId: string) => {
@@ -297,6 +299,28 @@ export default function BookingListView({
 
       {/* List-only Filters */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
+        {/* Guest Name Search */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-stone-600">Guest:</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={guestNameSearch}
+              onChange={(e) => setGuestNameSearch(e.target.value)}
+              placeholder="Search by name..."
+              className="px-3 py-1.5 pl-8 border border-stone-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent w-48"
+            />
+            <svg
+              className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+
         <div className="flex items-center gap-2">
           <label className="text-sm text-stone-600">From:</label>
           <input
@@ -330,12 +354,13 @@ export default function BookingListView({
             ))}
           </select>
         </div>
-        {(startDate || endDate || roomId) && (
+        {(startDate || endDate || roomId || guestNameSearch) && (
           <button
             onClick={() => {
               setStartDate('')
               setEndDate('')
               setRoomId('')
+              setGuestNameSearch('')
               onFiltersChange?.({ startDate: '', endDate: '', roomId: '' })
             }}
             className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
@@ -462,9 +487,19 @@ export default function BookingListView({
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm">
-                            <span className="text-stone-900">{formatDate(booking.checkIn)}</span>
-                            <span className="text-stone-400 mx-1">→</span>
-                            <span className="text-stone-900">{formatDate(booking.checkOut)}</span>
+                            <div>
+                              <span className="text-stone-900">{formatDate(booking.checkIn)}</span>
+                              <span className="text-stone-400 mx-1">→</span>
+                              <span className="text-stone-900">{formatDate(booking.checkOut)}</span>
+                            </div>
+                            {booking.arrivalTime && (
+                              <div className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {booking.arrivalTime}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-stone-600">

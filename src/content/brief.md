@@ -1,16 +1,5 @@
 # Accommodation Booking Admin System – Project Brief (FINAL, UPDATED)
 
-This brief includes:
-- All core features
-- All feedback rounds
-- All post-MVP feature extensions
-- All bugfix-related clarifications
-
-It is the **single source of truth**.
-Any further changes must be introduced as new feedback or new feature documents.
-
----
-
 ## 0. General Context
 
 This project is an **admin system for managing accommodations**, connected to a **public-facing booking website**.
@@ -24,7 +13,7 @@ The public website:
 - Allows booking by **room type**
 
 The admin interface:
-- Manages all content and bookings
+- Manages all content, pricing, availability, and bookings
 - Allows **booking by individual rooms**
 - Is available under `/admin`
 - Requires authentication
@@ -34,9 +23,12 @@ Tech stack:
 - **TypeScript**
 - **Tailwind CSS**
 - Minimal, clean, light UI with soft shadows
-- Local-first database, later deployable on **Vercel**
-- Claude must choose the most suitable DB + ORM
-- Image uploads must be converted to **webp**
+- **Prisma ORM** (already configured, compatible with Vercel)
+- Database must run locally and on **Vercel**
+- Image uploads must use **Vercel Blob or Cloudinary**
+  - Claude must choose the better option
+  - If registration is required, Claude must explicitly notify
+- All images stored as **webp**
 
 ---
 
@@ -44,8 +36,8 @@ Tech stack:
 
 All **language-dependent content must be editable in EN / HU / DE**.
 
-A global language selector inside the admin UI is **NOT required**.
-All multilingual fields must be editable **inline per language**.
+- No global language switcher is required in admin
+- All multilingual fields are edited **inline per language**
 
 Language-dependent fields include (but are not limited to):
 
@@ -65,19 +57,25 @@ The data model must support structured multilingual storage.
 
 ## 2. Admin Navigation
 
-### Sidebar Menu
+### Sidebar Menu (FINAL)
 
-- The sidebar menu entry must be labeled **"Rooms"**
-- This section represents the full hierarchy:
-  - Buildings
-  - Room Types
-  - Rooms
+- Dashboard
+- Calendar
+- Bookings
+- Rooms
+- Pricing
+- Users
+
+Definitions:
+- **Calendar** = booking timeline view
+- **Bookings** = list / table view
+- **Rooms** = Buildings + Room Types + Rooms management
 
 ---
 
 ## 3. Accommodation Structure
 
-### Hierarchy
+### Hierarchy (GLOBAL)
 
 Building  
 └─ Room Type  
@@ -87,8 +85,9 @@ This hierarchy is used consistently across:
 - Admin UI
 - Pricing
 - Booking timeline
-- Booking list view
 - Availability logic
+- Filters
+- Dropdowns
 
 ---
 
@@ -99,10 +98,14 @@ This hierarchy is used consistently across:
 - Name (multilingual)
 - Address OR latitude & longitude (Google Maps compatible)
 - Description (multilingual, rich text)
-- Images (ordered, file upload → webp)
+- Images:
+  - File upload only
+  - Ordered
+  - Converted to webp
+  - Stored via Vercel Blob or Cloudinary
 - House Rules:
   - N entries
-  - Two multilingual text fields
+  - Two multilingual text fields (label + value)
 - Amenities:
   - Admin-defined
   - Grouped by category
@@ -118,11 +121,11 @@ This hierarchy is used consistently across:
   - Mandatory / Optional
   - Per night / Per booking
 
-Buildings can be:
-- Created
-- Edited
-- Duplicated (without images)
-- Deleted (double confirmation if dependencies exist)
+Actions:
+- Create
+- Edit
+- Duplicate (without images)
+- Delete (double confirmation if dependencies exist)
 
 ---
 
@@ -132,13 +135,13 @@ Buildings can be:
 
 - Name (multilingual)
 - Description (multilingual, rich text)
-- Capacity (number of adults)
-- Amenities (admin-defined, multilingual)
-- Images (ordered, file upload → webp)
+- Capacity (maximum number of guests)
+- Amenities (multilingual)
+- Images (upload → webp)
 - Additional Prices (same structure as Building-level)
 
-Room Types:
-- Belong to one Building
+Rules:
+- Belongs to exactly one Building
 - Can be duplicated (without images)
 - Can be deleted (double confirmation if rooms exist)
 
@@ -155,223 +158,284 @@ Room Types:
 Inactive rooms:
 - Visible in admin UI
 - Clearly marked
-- NOT bookable
-- Disabled in all booking views
+- Disabled in Calendar & Bookings
+- Cannot receive new bookings
 
 ---
 
-## 7. Pricing Module (`/admin/prices`)
+## 7. Pricing Module (`/admin/pricing`)
 
-Prices are defined **per Room Type**.
+Pricing is defined primarily **per Room Type**, but visibility must always show full hierarchy.
 
 ### 7.1 Date Range Pricing
 
+Admins can define pricing rules by date range:
+
 - Start date – End date
-- Weekday price
-- Weekend price
+- Weekday price (Sun–Thu)
+- Weekend price (Fri–Sat)
 - Minimum nights
 - Active / Inactive toggle
 
 Rules:
-- Date ranges must NOT overlap
-- Creation must fail only on overlap or missing fields
-- Inactive ranges make all days unbookable
+- Date ranges **must NOT overlap**
+- Inactive ranges:
+  - Make all days unbookable
+  - Override prices
 
 ---
 
 ### 7.2 Calendar Pricing View
 
-- Calendar per Room Type
-- Always shows:
-  - Building name
-  - Room Type name
+- Always display:
+  - Building → Room Type → Room
+- Dropdowns must show full hierarchy
+- Example:
+  - `Lake House → Double Room → Room 2`
 
-Calendar cell states:
+Calendar cells show:
+- Day number
+- Price per night
+- Minimum nights (icon)
+
+Visual rules:
 - No price → grey
-- Inactive → light red
+- Inactive day → light red
+- Special Day → light blue + badge
 
-Pricing availability is the **single source of truth**.
+Actions:
+- Single day edit
+- Multi-day selection (mobile friendly)
 
 Inactive days:
-- Disable booking in all views
-- Are non-clickable
-- Show `cursor: not-allowed`
+- Not bookable
+- Affect all rooms of the Room Type
 
 ---
 
-## 8. Booking Management (CORE)
+## 8. Special Days
 
-### 8.1 Booking Sources
+Special Days represent holidays or special events.
 
-Sources:
+Features:
+- Name (multilingual)
+- Date range (start – end)
+- Visual style:
+  - Light blue background
+  - Badge with star icon and event name
+
+Displayed in:
+- Calendar view
+- Pricing calendar
+
+---
+
+## 9. Booking Management
+
+### 9.1 Booking Sources
+
+Sources (icon-based, not colored dots):
+
 - Website
-- Manual
+- Direct (formerly Manual)
 - Booking.com
 - Szállás.hu
 - Airbnb
 
-Source representation:
-- **Icons only**
-- Icons loaded from `/public/icons`
-- No color-dot indicators allowed
+Icons are loaded from `/public/icons`.
 
 ---
 
-### 8.2 Booking Statuses
+### 9.2 Booking Timeline (Calendar View)
 
-Supported statuses:
-- Incoming / Pending
-- Confirmed
-- Cancelled
-- Guest Arrived (Checked-in)
-- Guest Departed (Checked-out)
+- Horizontal infinite scroll
+- Sticky date header
+- Sticky left column
+- Default date = yesterday
+- Scroll range = ± selected interval
 
-Rules:
-- Checked-in / Checked-out are valid, persistable states
-- Must save without errors
-- Shown with green-toned icons + labels
-- Displayed consistently in:
-  - Timeline View
-  - Booking List View
-  - Booking detail views
-
----
-
-## 9. Booking Timeline View
-
-- Hierarchical rendering:
-  - Building (header)
-  - Room Type (header)
-  - Room (bookable row)
-- Always renders structure
-- Never filtered at data-query level
+Layout:
+- Grouped hierarchy:
+  - Building
+    - Room Type
+      - Room (only rooms are bookable)
 
 UI rules:
-- Inactive rooms disabled
-- Pricing-inactive days disabled
-- Half-day booking blocks (14:00 → 10:00)
+- Inactive rooms → disabled rows
+- Pricing-inactive days → light red, non-clickable
+- Weekends → darker grey background
+- Month labels clearly visible
+- Monthly & Weekly view modes:
+  - Monthly = very compact days
+  - Weekly = detailed view
 
-Drag & Drop:
-- Allowed between rooms and dates
-- Must respect availability
-- Price change requires confirmation
+Bookings:
+- Half-day offset (14:00 – 10:00)
+- Show guest name, count, icons
+- Drag & drop allowed (except Dashboard)
 
 ---
 
-## 10. Booking List View (NEW)
+### 9.3 Dashboard
 
-An alternative booking view in addition to Timeline View.
+- Read-only Calendar view
+- No drag & drop
+- No editing
+- Two action buttons only:
+  - Create Booking
+  - Create Special Day
 
-### Tabs
-- All Bookings
-- Upcoming Bookings
-- Past Bookings
+---
 
-### Table columns
+### 9.4 Booking List View
 
+Tabs:
+- Upcoming
+- Past
+- All (includes cancelled)
+
+Table features:
+- Pagination
+- Sorting:
+  - Name
+  - Dates
+  - Nights
+  - Guests
+  - Price
+- Filters:
+  - Building
+  - Room Type
+  - Room
+  - Guest name
+  - Source
+  - Date range
+
+Row details:
 - Booking ID (6-digit incremental)
-- Guest name + phone
+- Guest name
+- Phone
 - Dates
 - Nights
 - Guests
 - Total amount
-- Booking status
+- Status
 - Payment status
-- Note icon
-- Additional price icon
-
-Under guest name:
-- Building badge (grey)
-- Room Type badge (orange)
-- Room badge (blue)
-
-### Expandable rows
-
-- Inline expansion
-- Full booking details
-- Price breakdown
-- Edit Booking button
-- Uses SAME modal as Timeline View
-
-### Sorting & Pagination
-
-Default sorting:
-- Upcoming → Start date ASC
-- Past → Start date DESC
-- All → Start date ASC
-
-Sortable by:
-- Name
-- Dates
-- Nights
-- Guests
-- Price
+- Notes & additional prices icons
+- Badges:
+  - Building (grey)
+  - Room Type (orange)
+  - Room (blue)
 
 Cancelled bookings:
-- Visible in All Bookings
+- Visible in All tab
 - Light red row background
 
----
-
-## 11. Booking Filters
-
-### Global (All booking views)
-
-- Building
-- Room Type
-- Booking Source
-
-### Booking List View only
-
-- Date range
-- Room
-
-Filters must:
-- Never break hierarchy
-- Never hide structure
-- Apply instantly
+Expandable row:
+- Full booking details
+- Edit Booking button
 
 ---
 
-## 12. Booking Creation & Editing
+## 10. Booking Creation & Editing
 
-- Default source: Manual
-- All fields required
+### Required Fields
 
-Pricing behavior:
+- Email and phone are **optional**
+- All other fields required
+
+Rules:
+- Guest count ≤ room capacity
+- Arrival Time field (HH:MM)
+- Arrival Time visible everywhere
+
+Additional fields (checkboxes):
+- Invoice
+- Vendégem
+- Cleaned
+
+Rules:
+- If Checked Out AND checkout date passed → fields locked
+- Cancel disabled if booking is Completed
+
+---
+
+### Pricing Logic
+
 - Mandatory additional prices auto-applied
-- Optional prices selectable
-- Total recalculates automatically on any change
+- Optional additional prices selectable
+- Grouped by:
+  - Building-level
+  - Room Type–level
+- Recalculated on:
+  - Date change
+  - Room change
+  - Additional price change
 
-Manual bookings:
-- Total editable
-
-Non-manual:
-- Total read-only
-
----
-
-## 13. Image Handling
-
-- File upload only
-- Convert to webp
-- Preserve order
+Edit Booking modal:
+- Wide layout
+- Left: form fields
+- Right: price breakdown
+- Bottom sticky action buttons
 
 ---
 
-## 14. Authentication & Users
+## 11. Booking Status Flow
 
-- Admin authentication required
-- Users table:
-  - Name
-  - Email
-  - Password
-- Admin UI for user management
+Status order:
+1. Incoming
+2. Confirmed
+3. Checked In
+4. Checked Out
+
+- Status changes via icon buttons
+- Confirmation modal required
+- Cancel action:
+  - Separate button
+  - Confirmation modal
+  - Shows refund amount
+  - Sets status to Cancelled
 
 ---
 
-## 15. UI & Interaction Rules
+## 12. Payments
 
-- All clickable elements use `cursor: pointer`
+Payment Status flow:
+1. Pending
+2. Partially Paid
+3. Fully Paid
+4. Refunded
+
+Payments:
+- Logged entries:
+  - Date
+  - Amount
+  - Currency (EUR / HUF)
+  - Method:
+    - Cash
+    - Bank transfer
+    - Credit card
+  - Note
+
+Rules:
+- Overpayment highlighted in green
+- Outstanding amount shown if partial
+- Refund action:
+  - Confirmation modal
+  - Shows refund amount
+  - Sets payment status to Refunded
+  - Sets booking status to Cancelled
+
+---
+
+## 13. UI & UX Rules
+
+- All clickable elements → cursor: pointer
 - Disabled elements clearly styled
-- All async actions show loading indicator
+- All alerts must be modals:
+  - With X close button
+- Loading indicators for all async actions:
+  - Save
+  - Update
+  - Pricing changes
+  - Booking changes
+  - Drag & drop

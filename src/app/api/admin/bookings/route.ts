@@ -249,10 +249,15 @@ export async function POST(request: NextRequest) {
         guestCount: parseInt(data.guestCount) || 1,
         checkIn,
         checkOut,
+        arrivalTime: data.arrivalTime || null,
         status: data.status || 'INCOMING',
         paymentStatus: data.paymentStatus || 'PENDING',
         notes: data.notes || null,
         totalAmount: data.totalAmount ? parseFloat(data.totalAmount) : null,
+        // Status tracking checkboxes
+        invoiceSent: data.invoiceSent || false,
+        vendegem: data.vendegem || false,
+        cleaned: data.cleaned || false,
         additionalPrices: {
           create: additionalPricesCreate,
         },

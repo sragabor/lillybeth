@@ -214,11 +214,16 @@ model Booking {
   guestCount       Int
   checkIn          DateTime                 @db.Date
   checkOut         DateTime                 @db.Date
+  arrivalTime      String?
   status           BookingStatus            @default(INCOMING)
   paymentStatus    PaymentStatus            @default(PENDING)
   notes            String?
   totalAmount      Float?
   roomId           String
+  // Status tracking checkboxes
+  invoiceSent      Boolean                  @default(false)
+  vendegem         Boolean                  @default(false)
+  cleaned          Boolean                  @default(false)
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
   additionalPrices BookingAdditionalPrice[]
@@ -229,21 +234,28 @@ model Booking {
 }
 
 model Payment {
-  id        String        @id @default(cuid())
+  id        String          @id @default(cuid())
   amount    Float
+  currency  PaymentCurrency @default(EUR)
   method    PaymentMethod
-  date      DateTime      @db.Date
+  date      DateTime        @db.Date
   note      String?
   bookingId String
-  createdAt DateTime      @default(now())
-  booking   Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  booking   Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("payments")
+}
+
+enum PaymentCurrency {
+  EUR
+  HUF
 }
 
 enum PaymentMethod {
   CASH
   TRANSFER
+  CREDIT_CARD
 }
 
 model BookingAdditionalPrice {
@@ -278,4 +290,15 @@ enum PaymentStatus {
   PARTIALLY_PAID
   FULLY_PAID
   REFUNDED
+}
+
+model SpecialDay {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("special_days")
 }

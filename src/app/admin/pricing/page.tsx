@@ -5,6 +5,12 @@ import { LocalizedText } from '@/lib/i18n'
 import { getLocalizedText } from '@/lib/i18n/utils'
 import { useLanguage } from '@/contexts/LanguageContext'
 
+interface Room {
+  id: string
+  name: string
+  isActive: boolean
+}
+
 interface RoomType {
   id: string
   name: LocalizedText
@@ -13,6 +19,7 @@ interface RoomType {
     id: string
     name: string
   }
+  rooms: Room[]
 }
 
 interface DateRangePrice {
@@ -33,6 +40,7 @@ interface DayPricing {
   isInactive: boolean
   source: 'override' | 'range' | 'none'
   isWeekend: boolean
+  specialDay: string | null
 }
 
 interface CalendarOverride {
@@ -396,11 +404,14 @@ export default function PricingPage() {
 
     const isSelected = selectedDates.has(day.date)
     const isToday = day.date === new Date().toISOString().split('T')[0]
+    const isSpecialDay = !!day.specialDay
 
     let baseClasses = 'relative p-2 min-h-[80px] border border-stone-200 rounded-lg cursor-pointer transition-all '
 
     if (day.isInactive) {
       baseClasses += 'bg-red-50 hover:bg-red-100 '
+    } else if (isSpecialDay) {
+      baseClasses += 'bg-sky-50 hover:bg-sky-100 border-sky-200 '
     } else if (day.price === null) {
       baseClasses += 'bg-stone-100 hover:bg-stone-200 '
     } else if (day.source === 'override') {
@@ -466,28 +477,58 @@ export default function PricingPage() {
         <select
           value={selectedRoomTypeId}
           onChange={(e) => setSelectedRoomTypeId(e.target.value)}
-          className="w-full md:w-96 px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
+          className="w-full md:w-auto min-w-[400px] px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer"
         >
           {Object.entries(groupedRoomTypes).map(([buildingName, types]) => (
-            <optgroup key={buildingName} label={buildingName}>
+            <optgroup key={buildingName} label={`── ${buildingName} ──`}>
               {types.map((rt) => (
                 <option key={rt.id} value={rt.id}>
-                  {getLocalizedText(rt.name, language)} (Capacity: {rt.capacity})
+                  {buildingName} → {getLocalizedText(rt.name, language)} (Capacity: {rt.capacity})
                 </option>
               ))}
             </optgroup>
           ))}
         </select>
 
-        {/* Current Selection Context */}
+        {/* Current Selection Context with Room Info */}
         {selectedRoomTypeId && (() => {
           const selectedRoomType = roomTypes.find(rt => rt.id === selectedRoomTypeId)
           return selectedRoomType ? (
-            <div className="mt-3 flex items-center gap-2 text-sm">
-              <span className="text-stone-500">Editing prices for:</span>
-              <span className="font-medium text-stone-800">
-                {selectedRoomType.building.name} → {getLocalizedText(selectedRoomType.name, language)}
-              </span>
+            <div className="mt-4 p-4 bg-stone-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm text-stone-500">Editing prices for:</span>
+                <span className="text-lg font-semibold text-stone-900">
+                  {selectedRoomType.building.name} → {getLocalizedText(selectedRoomType.name, language)}
+                </span>
+              </div>
+
+              {/* Rooms affected by this pricing */}
+              <div className="border-t border-stone-200 pt-3">
+                <span className="text-sm text-stone-500 block mb-2">
+                  Rooms affected by this pricing ({selectedRoomType.rooms?.length || 0}):
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {selectedRoomType.rooms && selectedRoomType.rooms.length > 0 ? (
+                    selectedRoomType.rooms.map((room) => (
+                      <span
+                        key={room.id}
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+                          room.isActive
+                            ? 'bg-stone-200 text-stone-700'
+                            : 'bg-stone-100 text-stone-400'
+                        }`}
+                      >
+                        {selectedRoomType.building.name} → {getLocalizedText(selectedRoomType.name, language)} → {room.name}
+                        {!room.isActive && (
+                          <span className="ml-1.5 text-xs text-stone-400">(inactive)</span>
+                        )}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-stone-400 italic">No rooms defined for this room type</span>
+                  )}
+                </div>
+              </div>
             </div>
           ) : null
         })()}
@@ -634,7 +675,7 @@ export default function PricingPage() {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-6 mb-4 text-sm">
+        <div className="flex items-center gap-6 mb-4 text-sm flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-stone-100 border border-stone-200 rounded" />
             <span className="text-stone-600">No price</span>
@@ -650,6 +691,14 @@ export default function PricingPage() {
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-50 border border-red-200 rounded" />
             <span className="text-stone-600">Inactive</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-sky-50 border border-sky-200 rounded flex items-center justify-center">
+              <svg className="w-2.5 h-2.5 text-sky-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            </div>
+            <span className="text-stone-600">Special day</span>
           </div>
         </div>
 
@@ -681,10 +730,18 @@ export default function PricingPage() {
                   key={day.date}
                   onClick={() => handleDayClick(day)}
                   className={getDayClasses(day)}
+                  title={day.specialDay || undefined}
                 >
-                  <span className={`text-sm font-medium ${day.isInactive ? 'text-red-600' : 'text-stone-900'}`}>
-                    {dayNum}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-medium ${day.isInactive ? 'text-red-600' : day.specialDay ? 'text-sky-700' : 'text-stone-900'}`}>
+                      {dayNum}
+                    </span>
+                    {day.specialDay && (
+                      <svg className="w-3 h-3 text-sky-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                      </svg>
+                    )}
+                  </div>
 
                   {!day.isInactive && day.price !== null && (
                     <div className="mt-1">

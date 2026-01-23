@@ -1,87 +1,53 @@
-# Feedback – Vercel Compatibility, Image Upload Refactor & Multilingual Room Types
+# Feedback – Special Days, Pricing & Dashboard Adjustments
 
-This feedback introduces necessary architectural changes to ensure
-full compatibility with Vercel hosting and to complete multilingual support.
+## 1. Special Days – Date Range Support
 
-This is a controlled refactor, not a feature request.
+Currently, Special Days can only be created for a single day.
 
----
-
-## 1. Image Upload Must Work on Vercel (Critical)
-
-### Current issue
-Image uploads currently attempt to write files into the `/public` folder.
-This does NOT work on Vercel, because the filesystem is read-only.
-
-### Required change
-Refactor the image upload system to use **external object storage** instead of the local filesystem.
-
-Allowed solutions:
-- **Vercel Blob**
-- OR **Cloudinary**
-
-Claude must:
-- Choose the most suitable solution for this project
-- Clearly justify the choice
-- Refactor ALL image uploads accordingly:
-  - Buildings
-  - Room Types
-  - Rooms
-- Ensure:
-  - Upload works in local development
-  - Upload works on Vercel
-  - Image order is preserved
-  - Images are converted to **webp**
-  - Stored image URLs are saved in the database
-
-### Important
-If the chosen solution requires:
-- Account registration
-- API keys
-- Environment variables
-
-Claude MUST clearly state:
-- Where to register
-- Which credentials are needed
-- Which environment variables must be added
+Change request:
+- Allow defining a **date range** for Special Days
+- A Special Day can span multiple consecutive days (start date – end date)
+- All days in the range must:
+    - Be highlighted in the Calendar view
+    - Be highlighted in the Pricing calendar
+    - Use the existing visual style:
+        - Light blue background
+        - Badge with star icon and event name
 
 ---
 
-## 2. Room Type Names Must Be Multilingual (Missing Requirement)
+## 2. Pricing Management – Room Identification
 
-### Current issue
-Room Type names are currently treated as single-language values.
+In the Pricing management view, room information is currently missing.
 
-### Required behavior
-Room Type names must be:
-- Fully multilingual (EN / HU / DE)
-- Editable inline per language
-- Stored using the same multilingual structure as:
-  - Building names
-  - Descriptions
-  - Other translatable fields
+Issues:
+- Room names are not visible in:
+    - The Room Type / Room dropdown
+    - The header or context information below
 
-This affects:
-- Admin UI
-- Booking timeline
-- Booking list view
-- Public website data model
+Required behavior:
+- Everywhere pricing is managed, the following hierarchy must be clearly visible:
+    - **Building → Room Type → Room**
+- Dropdowns and labels must show full context, for example:
+    - `Lake House → Double Room → Room 2`
 
-Claude must:
-- Update the data model
-- Update forms
-- Ensure backward compatibility or migration if needed
+This is required to avoid ambiguity when multiple buildings and room types exist.
 
 ---
 
-## Summary
+## 3. Dashboard – Simplification & Actions
 
-This feedback requires:
-- Refactoring image uploads for Vercel compatibility
-- Completing multilingual support for Room Type names
+Current issue:
+- The Dashboard displays statistics such as number of Rooms and Buildings, which are not needed.
 
-This is NOT optional.
-These changes are required before production deployment.
+Change request:
+- Remove Room / Building counters from the Dashboard
+- Instead, add two primary action buttons:
+    1. **Create Booking**
+        - Opens the existing “Create Booking” modal
+    2. **Create Special Day**
+        - Opens the “Create Special Day” modal
 
-No unrelated refactors.
-No UI redesigns.
+Notes:
+- Dashboard remains a **read-only Calendar view**
+- No editing, drag & drop, or booking modification allowed from the Dashboard

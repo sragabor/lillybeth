@@ -9,6 +9,18 @@ interface DayPricing {
   isInactive: boolean
   source: 'override' | 'range' | 'none'
   isWeekend: boolean
+  specialDay: string | null
+}
+
+// Helper to generate all dates in a range
+function getDatesInRange(startDate: Date, endDate: Date): string[] {
+  const dates: string[] = []
+  const current = new Date(startDate)
+  while (current <= endDate) {
+    dates.push(current.toISOString().split('T')[0])
+    current.setDate(current.getDate() + 1)
+  }
+  return dates
 }
 
 // GET computed pricing for a month
@@ -61,6 +73,27 @@ export async function GET(
     for (const override of calendarOverrides) {
       const dateKey = override.date.toISOString().split('T')[0]
       overrideMap.set(dateKey, override)
+    }
+
+    // Fetch special days for this month (with date range support)
+    const specialDaysList = await prisma.specialDay.findMany({
+      where: {
+        AND: [
+          { startDate: { lte: lastDay } },
+          { endDate: { gte: firstDay } },
+        ],
+      },
+    })
+
+    // Create a map of special days by date (expand ranges)
+    const specialDaysMap = new Map<string, string>()
+    for (const specialDay of specialDaysList) {
+      const rangeStart = specialDay.startDate > firstDay ? specialDay.startDate : firstDay
+      const rangeEnd = specialDay.endDate < lastDay ? specialDay.endDate : lastDay
+      const dates = getDatesInRange(rangeStart, rangeEnd)
+      for (const dateStr of dates) {
+        specialDaysMap.set(dateStr, specialDay.name)
+      }
     }
 
     // Generate pricing for each day of the month
@@ -120,6 +153,7 @@ export async function GET(
         isInactive,
         source,
         isWeekend,
+        specialDay: specialDaysMap.get(dateKey) || null,
       })
 
       // Move to next day

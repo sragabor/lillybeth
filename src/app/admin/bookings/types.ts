@@ -39,11 +39,13 @@ export interface BookingAdditionalPrice {
 export type BookingSource = 'MANUAL' | 'WEBSITE' | 'BOOKING_COM' | 'SZALLAS_HU' | 'AIRBNB'
 export type BookingStatus = 'INCOMING' | 'CONFIRMED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED'
 export type PaymentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'FULLY_PAID' | 'REFUNDED'
-export type PaymentMethod = 'CASH' | 'TRANSFER'
+export type PaymentMethod = 'CASH' | 'TRANSFER' | 'CREDIT_CARD'
+export type PaymentCurrency = 'EUR' | 'HUF'
 
 export interface Payment {
   id: string
   amount: number
+  currency: PaymentCurrency
   method: PaymentMethod
   date: string
   note: string | null
@@ -60,6 +62,7 @@ export interface Booking {
   guestCount: number
   checkIn: string
   checkOut: string
+  arrivalTime: string | null
   status: BookingStatus
   paymentStatus: PaymentStatus
   notes: string | null
@@ -69,6 +72,10 @@ export interface Booking {
   additionalPrices: BookingAdditionalPrice[]
   payments: Payment[]
   nights?: number
+  // Status tracking checkboxes
+  invoiceSent: boolean
+  vendegem: boolean
+  cleaned: boolean
 }
 
 export interface AvailableRoom {
@@ -110,6 +117,7 @@ export interface BookingFormData {
   guestCount: string
   checkIn: string
   checkOut: string
+  arrivalTime: string
   status: BookingStatus
   paymentStatus: PaymentStatus
   notes: string
@@ -202,6 +210,7 @@ export const PAYMENT_COLORS = {
 export const PAYMENT_METHOD_LABELS = {
   CASH: 'Cash',
   TRANSFER: 'Bank Transfer',
+  CREDIT_CARD: 'Credit Card',
 }
 
 // Default form values
@@ -214,6 +223,7 @@ export const DEFAULT_BOOKING_FORM: BookingFormData = {
   guestCount: '1',
   checkIn: '',
   checkOut: '',
+  arrivalTime: '',
   status: 'INCOMING',
   paymentStatus: 'PENDING',
   notes: '',

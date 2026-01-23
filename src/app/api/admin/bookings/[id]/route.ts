@@ -145,10 +145,15 @@ export async function PUT(
     if (data.guestPhone !== undefined) updateData.guestPhone = data.guestPhone || null
     if (data.guestCount !== undefined) updateData.guestCount = parseInt(data.guestCount)
     if (data.source !== undefined) updateData.source = data.source
+    if (data.arrivalTime !== undefined) updateData.arrivalTime = data.arrivalTime || null
     if (data.status !== undefined) updateData.status = data.status
     if (data.paymentStatus !== undefined) updateData.paymentStatus = data.paymentStatus
     if (data.notes !== undefined) updateData.notes = data.notes || null
     if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount ? parseFloat(data.totalAmount) : null
+    // Status tracking checkboxes
+    if (data.invoiceSent !== undefined) updateData.invoiceSent = data.invoiceSent
+    if (data.vendegem !== undefined) updateData.vendegem = data.vendegem
+    if (data.cleaned !== undefined) updateData.cleaned = data.cleaned
 
     // Handle date changes
     if (data.checkIn !== undefined) updateData.checkIn = new Date(data.checkIn)
