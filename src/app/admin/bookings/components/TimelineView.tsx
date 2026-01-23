@@ -695,10 +695,10 @@ export default function TimelineView({
                     return monthGroups.map((group, idx) => (
                       <div
                         key={idx}
-                        className="flex-shrink-0 flex items-center justify-center bg-stone-800 text-white border-r border-stone-600"
+                        className="flex-shrink-0 flex items-center justify-start bg-stone-500  text-white border-r border-stone-600"
                         style={{ width: group.count * DAY_WIDTH }}
                       >
-                        <span className={`font-semibold tracking-wide ${viewMode === 'monthly' ? 'text-[10px]' : 'text-sm'}`}>
+                        <span className={`font-semibold tracking-wide sticky left-5 ml-5 mr-5 ${viewMode === 'monthly' ? 'text-[10px]' : 'text-sm'}`}>
                           {viewMode === 'monthly' ? group.monthShort : group.month}
                         </span>
                       </div>
