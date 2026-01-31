@@ -9,6 +9,7 @@ interface PriceInput {
   priceEur: number
   mandatory: boolean
   perNight: boolean
+  perGuest: boolean
 }
 
 // POST create/update additional prices (batch)
@@ -36,6 +37,7 @@ export async function POST(
           priceEur: price.priceEur,
           mandatory: price.mandatory,
           perNight: price.perNight,
+          perGuest: price.perGuest || false,
           order: index,
         })),
       })

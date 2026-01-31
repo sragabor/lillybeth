@@ -150,6 +150,9 @@ export async function PUT(
     if (data.paymentStatus !== undefined) updateData.paymentStatus = data.paymentStatus
     if (data.notes !== undefined) updateData.notes = data.notes || null
     if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount ? parseFloat(data.totalAmount) : null
+    // Custom HUF price
+    if (data.hasCustomHufPrice !== undefined) updateData.hasCustomHufPrice = data.hasCustomHufPrice
+    if (data.customHufPrice !== undefined) updateData.customHufPrice = data.customHufPrice ? parseFloat(data.customHufPrice) : null
     // Status tracking checkboxes
     if (data.invoiceSent !== undefined) updateData.invoiceSent = data.invoiceSent
     if (data.vendegem !== undefined) updateData.vendegem = data.vendegem

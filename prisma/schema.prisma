@@ -89,6 +89,7 @@ model BuildingAdditionalPrice {
   priceEur   Float
   mandatory  Boolean  @default(false)
   perNight   Boolean  @default(false)
+  perGuest   Boolean  @default(false)
   order      Int      @default(0)
   buildingId String
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -154,6 +155,7 @@ model RoomTypeAdditionalPrice {
   priceEur   Float
   mandatory  Boolean  @default(false)
   perNight   Boolean  @default(false)
+  perGuest   Boolean  @default(false)
   order      Int      @default(0)
   roomTypeId String
   roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
@@ -219,6 +221,9 @@ model Booking {
   paymentStatus    PaymentStatus            @default(PENDING)
   notes            String?
   totalAmount      Float?
+  // Custom HUF price for special agreements (does not override EUR price)
+  hasCustomHufPrice Boolean                 @default(false)
+  customHufPrice    Float?
   roomId           String
   // Status tracking checkboxes
   invoiceSent      Boolean                  @default(false)

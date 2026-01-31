@@ -254,6 +254,9 @@ export async function POST(request: NextRequest) {
         paymentStatus: data.paymentStatus || 'PENDING',
         notes: data.notes || null,
         totalAmount: data.totalAmount ? parseFloat(data.totalAmount) : null,
+        // Custom HUF price
+        hasCustomHufPrice: data.hasCustomHufPrice || false,
+        customHufPrice: data.customHufPrice ? parseFloat(data.customHufPrice) : null,
         // Status tracking checkboxes
         invoiceSent: data.invoiceSent || false,
         vendegem: data.vendegem || false,

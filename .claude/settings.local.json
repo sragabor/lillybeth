@@ -15,7 +15,8 @@
       "Bash(source .env.local)",
       "Bash(set +a)",
       "Bash(npx tsx:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(ls:*)"
     ]
   }
 }

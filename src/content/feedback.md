@@ -1,31 +1,26 @@
-# Feedback – Dashboard statistics extension
+## 6. Visual indication of custom HUF final price
 
-## 1. Dashboard summary statistics
+If a booking has a **custom agreed final price in HUF**:
 
-Extend the Dashboard view with additional summary information next to the existing action buttons
-(Create Booking, Create Special Day).
+- This must be **clearly and consistently indicated** in all booking-related views
 
-The Dashboard should display the following real-time statistics:
+Required locations:
+- Booking list (table view)
+- Booking expanded row / details view
+- Edit booking modal
+- Calendar hover / tooltip (if final price is shown there)
 
-### Booking statistics
-- Total number of bookings
-- Number of open / not completed bookings
-- Number of unpaid bookings
-  - Payment status is NOT Fully Paid
+Visual requirements:
+- The EUR final price remains the primary price
+- The HUF price appears as a **secondary value**
+- Clearly label it as:
+  - “Custom agreement (HUF)”
+- Use a visual indicator such as:
+  - badge
+  - icon
+  - subtle highlight
+- It must be immediately obvious that:
+  - this is **not a converted value**
+  - this is an **explicit custom agreement**
 
-### Guest statistics
-- Number of guests currently staying today
-  - Bookings where:
-    - Today is between start date and end date (inclusive)
-    - Booking status is Checked in
-
-### UI / UX requirements
-- Statistics should be clearly visible next to the two action buttons
-- Use clean, minimal cards or inline badges
-- Each statistic should have:
-  - A label
-  - A numeric value
-- Visual hierarchy should not overpower the Calendar view
-- Dashboard remains **read-only**
-  - No editing
-  - No drag & drop
+The same booking must never appear ambiguous regarding which price is official and which is custom.

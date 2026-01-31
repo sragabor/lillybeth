@@ -8,6 +8,7 @@ interface AdditionalPriceOption {
   priceEur: number
   mandatory: boolean
   perNight: boolean
+  perGuest: boolean
   origin: 'building' | 'roomType'
 }
 
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest) {
     const selectedPriceIds: string[] = data.selectedPriceIds || []
     // Selected optional price titles (for matching by title, used in drag & drop)
     const selectedPriceTitles: string[] = data.selectedPriceTitles || []
+    // Guest count for per-guest pricing (default to 1)
+    const guestCount: number = data.guestCount ? parseInt(data.guestCount) : 1
 
     // Get room with room type and building
     const room = await prisma.room.findUnique({
@@ -163,6 +166,7 @@ export async function POST(request: NextRequest) {
         priceEur: price.priceEur,
         mandatory: price.mandatory,
         perNight: price.perNight,
+        perGuest: price.perGuest,
         origin: 'building',
       })
     }
@@ -177,6 +181,7 @@ export async function POST(request: NextRequest) {
         priceEur: price.priceEur,
         mandatory: price.mandatory,
         perNight: price.perNight,
+        perGuest: price.perGuest,
         origin: 'roomType',
       })
     }
@@ -190,7 +195,10 @@ export async function POST(request: NextRequest) {
       const isSelectedById = selectedPriceIds.includes(priceOption.id)
       const isSelectedByTitle = selectedPriceTitles.includes(priceOption.title)
       if (priceOption.mandatory || isSelectedById || isSelectedByTitle) {
-        const quantity = priceOption.perNight ? nights : 1
+        // Calculate quantity: base × (nights if perNight) × (guests if perGuest)
+        const nightMultiplier = priceOption.perNight ? nights : 1
+        const guestMultiplier = priceOption.perGuest ? guestCount : 1
+        const quantity = nightMultiplier * guestMultiplier
         const total = priceOption.priceEur * quantity
 
         additionalPrices.push({

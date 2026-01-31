@@ -34,6 +34,7 @@ interface AdditionalPrice {
   priceEur: number
   mandatory: boolean
   perNight: boolean
+  perGuest: boolean
 }
 
 interface BuildingImage {
@@ -99,7 +100,7 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
 
   const [houseRules, setHouseRules] = useState<{ key: LocalizedText; value: LocalizedText }[]>([])
   const [amenityCategories, setAmenityCategories] = useState<{ name: LocalizedText; amenities: { name: LocalizedText }[] }[]>([])
-  const [additionalPrices, setAdditionalPrices] = useState<{ title: LocalizedText; priceEur: number; mandatory: boolean; perNight: boolean }[]>([])
+  const [additionalPrices, setAdditionalPrices] = useState<{ title: LocalizedText; priceEur: number; mandatory: boolean; perNight: boolean; perGuest: boolean }[]>([])
   const [images, setImages] = useState<GalleryImage[]>([])
 
   // Room type modal
@@ -145,6 +146,7 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
           priceEur: p.priceEur,
           mandatory: p.mandatory,
           perNight: p.perNight,
+          perGuest: p.perGuest || false,
         })))
         setImages(b.images.map((i) => ({
           id: i.id,
@@ -778,12 +780,25 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
                       />
                       Per Night
                     </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={price.perGuest}
+                        onChange={(e) => {
+                          const newPrices = [...additionalPrices]
+                          newPrices[index].perGuest = e.target.checked
+                          setAdditionalPrices(newPrices)
+                        }}
+                        className="rounded border-stone-300"
+                      />
+                      Per Guest
+                    </label>
                   </div>
                 </div>
               </div>
             ))}
             <button
-              onClick={() => setAdditionalPrices([...additionalPrices, { title: createEmptyLocalizedText(), priceEur: 0, mandatory: false, perNight: false }])}
+              onClick={() => setAdditionalPrices([...additionalPrices, { title: createEmptyLocalizedText(), priceEur: 0, mandatory: false, perNight: false, perGuest: false }])}
               className="text-amber-600 hover:text-amber-700 text-sm font-medium"
             >
               + Add Price

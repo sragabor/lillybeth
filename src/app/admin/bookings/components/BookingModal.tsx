@@ -54,7 +54,11 @@ export default function BookingModal({
   const [payments, setPayments] = useState<Payment[]>([])
   const [paymentSummary, setPaymentSummary] = useState<{
     totalAmount: number | null
+    hasCustomHufPrice: boolean
+    customHufPrice: number | null
     totalPaid: number
+    paidEur: number
+    paidHuf: number
     remaining: number
     paymentStatus: string
   } | null>(null)
@@ -82,12 +86,17 @@ export default function BookingModal({
   const [vendegem, setVendegem] = useState(false)
   const [cleaned, setCleaned] = useState(false)
 
+  // Custom HUF price state
+  const [hasCustomHufPrice, setHasCustomHufPrice] = useState(false)
+  const [customHufPrice, setCustomHufPrice] = useState('')
+
   // Load price breakdown for edit mode and match existing additional prices by title
   const loadEditModePrice = async (
     roomId: string,
     checkIn: string,
     checkOut: string,
-    existingPrices: { title: string }[]
+    existingPrices: { title: string }[],
+    guestCount: number
   ) => {
     setCalculatingPrice(true)
     try {
@@ -98,6 +107,7 @@ export default function BookingModal({
           roomId,
           checkIn,
           checkOut,
+          guestCount,
           selectedPriceIds: [], // First pass to get available prices
         }),
       })
@@ -126,6 +136,7 @@ export default function BookingModal({
             roomId,
             checkIn,
             checkOut,
+            guestCount,
             selectedPriceIds: Array.from(matchedIds),
           }),
         })
@@ -171,7 +182,8 @@ export default function BookingModal({
           editingBooking.roomId,
           checkIn,
           checkOut,
-          editingBooking.additionalPrices
+          editingBooking.additionalPrices,
+          editingBooking.guestCount
         )
 
         // Load payments for this booking
@@ -181,6 +193,10 @@ export default function BookingModal({
         setInvoiceSent(editingBooking.invoiceSent || false)
         setVendegem(editingBooking.vendegem || false)
         setCleaned(editingBooking.cleaned || false)
+
+        // Initialize custom HUF price
+        setHasCustomHufPrice(editingBooking.hasCustomHufPrice || false)
+        setCustomHufPrice(editingBooking.customHufPrice?.toString() || '')
       } else {
         // Reset payment state for new bookings
         setPayments([])
@@ -191,6 +207,10 @@ export default function BookingModal({
         setInvoiceSent(false)
         setVendegem(false)
         setCleaned(false)
+
+        // Reset custom HUF price
+        setHasCustomHufPrice(false)
+        setCustomHufPrice('')
         // Create mode
         setSelectedPriceIds(new Set())
         setBookingForm({
@@ -224,6 +244,7 @@ export default function BookingModal({
           roomId: bookingForm.roomId,
           checkIn: bookingForm.checkIn,
           checkOut: bookingForm.checkOut,
+          guestCount: bookingForm.guestCount,
           selectedPriceIds: Array.from(idsToUse),
         }),
       })
@@ -317,6 +338,9 @@ export default function BookingModal({
           invoiceSent,
           vendegem,
           cleaned,
+          // Custom HUF price
+          hasCustomHufPrice,
+          customHufPrice: hasCustomHufPrice && customHufPrice ? parseFloat(customHufPrice) : null,
         }),
       })
 
@@ -518,8 +542,9 @@ export default function BookingModal({
   if (!isOpen) return null
 
   const isCancelled = editingBooking?.status === 'CANCELLED'
-  // Price editing is locked for CONFIRMED, CHECKED_IN, CHECKED_OUT, and CANCELLED statuses
-  const isPriceLocked = Boolean(editingBooking && ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'].includes(editingBooking.status))
+  // Price editing is locked only for CHECKED_OUT and CANCELLED statuses
+  // CONFIRMED and CHECKED_IN bookings remain editable
+  const isPriceLocked = Boolean(editingBooking && ['CHECKED_OUT', 'CANCELLED'].includes(editingBooking.status))
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -849,6 +874,9 @@ export default function BookingModal({
                                         {price.perNight && (
                                           <span className="ml-1 text-xs text-stone-500">/night</span>
                                         )}
+                                        {price.perGuest && (
+                                          <span className="ml-1 text-xs text-stone-500">/guest</span>
+                                        )}
                                       </span>
                                     </div>
                                     <span className="text-sm font-medium text-stone-700">
@@ -889,6 +917,9 @@ export default function BookingModal({
                                         )}
                                         {price.perNight && (
                                           <span className="ml-1 text-xs text-stone-500">/night</span>
+                                        )}
+                                        {price.perGuest && (
+                                          <span className="ml-1 text-xs text-stone-500">/guest</span>
                                         )}
                                       </span>
                                     </div>
@@ -958,8 +989,57 @@ export default function BookingModal({
                 className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white disabled:bg-stone-100 disabled:cursor-not-allowed text-lg font-semibold"
               />
               <p className="mt-1 text-xs text-stone-500">
-                {isPriceLocked ? 'Price is locked after booking is confirmed.' : 'Auto-filled from calculation. Override if needed.'}
+                {isPriceLocked ? 'Price is locked after checkout.' : 'Auto-filled from calculation. Override if needed.'}
               </p>
+
+            </div>
+
+            {/* Custom HUF Price - Separate Section */}
+            <div className={`rounded-lg p-4 ${hasCustomHufPrice ? 'bg-purple-50 border-2 border-purple-300' : 'bg-stone-50 border border-stone-200'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`flex items-center gap-2 ${isCancelled || isPriceLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={hasCustomHufPrice}
+                    onChange={(e) => setHasCustomHufPrice(e.target.checked)}
+                    disabled={isCancelled || isPriceLocked}
+                    className="w-4 h-4 rounded border-stone-300 text-purple-600 focus:ring-purple-500 disabled:cursor-not-allowed"
+                  />
+                  <span className={`text-sm font-medium ${hasCustomHufPrice ? 'text-purple-800' : 'text-stone-700'}`}>
+                    Custom HUF Price
+                  </span>
+                </label>
+                {hasCustomHufPrice && (
+                  <span className="px-2 py-0.5 text-xs font-bold bg-purple-200 text-purple-800 rounded">
+                    HUF
+                  </span>
+                )}
+              </div>
+
+              {hasCustomHufPrice ? (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="1"
+                      value={customHufPrice}
+                      onChange={(e) => setCustomHufPrice(e.target.value)}
+                      placeholder="Enter HUF amount"
+                      disabled={isCancelled || isPriceLocked}
+                      className="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white disabled:bg-stone-100 disabled:cursor-not-allowed text-lg font-semibold"
+                    />
+                    <span className="text-lg font-semibold text-purple-700">Ft</span>
+                  </div>
+                  <div className="mt-2 p-2 bg-purple-100 rounded text-xs text-purple-800">
+                    <p className="font-medium">This is a separately agreed HUF amount.</p>
+                    <p className="mt-1">It does NOT replace or convert the EUR price above. Both values are stored and displayed.</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-stone-500">
+                  Enable this to record a custom HUF price agreed with the guest.
+                </p>
+              )}
             </div>
 
             {/* Payment Status Select */}
@@ -1076,13 +1156,25 @@ export default function BookingModal({
                       <span className="text-stone-600">Total Amount:</span>
                       <span className="font-medium">{paymentSummary.totalAmount?.toFixed(2) || '0.00'} EUR</span>
                     </div>
+                    {paymentSummary.hasCustomHufPrice && paymentSummary.customHufPrice && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-stone-600">Custom HUF Price:</span>
+                        <span className="font-medium">{paymentSummary.customHufPrice.toLocaleString()} HUF</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
-                      <span className="text-stone-600">Total Paid:</span>
-                      <span className="font-medium text-green-600">{paymentSummary.totalPaid.toFixed(2)} EUR</span>
+                      <span className="text-stone-600">Paid (EUR):</span>
+                      <span className="font-medium text-green-600">{paymentSummary.paidEur.toFixed(2)} EUR</span>
                     </div>
+                    {paymentSummary.paidHuf > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-stone-600">Paid (HUF):</span>
+                        <span className="font-medium text-green-600">{paymentSummary.paidHuf.toLocaleString()} HUF</span>
+                      </div>
+                    )}
                     {paymentSummary.remaining > 0 && (
                       <div className="flex justify-between text-sm font-medium pt-1 border-t border-stone-200">
-                        <span className="text-stone-700">Remaining:</span>
+                        <span className="text-stone-700">Remaining (EUR):</span>
                         <span className="text-amber-600">{paymentSummary.remaining.toFixed(2)} EUR</span>
                       </div>
                     )}

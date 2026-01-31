@@ -968,6 +968,9 @@ export default function TimelineView({
                           <p className={`text-[10px] font-medium truncate ${colors.text}`}>
                             {booking.guestName.split(' ').map(n => n[0]).join('').slice(0, 3)}
                           </p>
+                          {booking.hasCustomHufPrice && booking.customHufPrice && (
+                            <span className="text-[8px] font-bold text-purple-700 flex-shrink-0">Ft</span>
+                          )}
                           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                             booking.paymentStatus === 'FULLY_PAID' ? 'bg-green-500' :
                             booking.paymentStatus === 'PARTIALLY_PAID' ? 'bg-amber-500' :
@@ -988,6 +991,12 @@ export default function TimelineView({
                             </p>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
+                            {/* Custom HUF price indicator */}
+                            {booking.hasCustomHufPrice && booking.customHufPrice && (
+                              <span className="text-[9px] px-1 py-0.5 font-bold bg-purple-100 text-purple-700 rounded" title="Custom HUF price">
+                                HUF
+                              </span>
+                            )}
                             {/* Payment status indicator */}
                             <span className={`w-2 h-2 rounded-full ${
                               booking.paymentStatus === 'FULLY_PAID' ? 'bg-green-500' :
@@ -1101,10 +1110,22 @@ export default function TimelineView({
                   {PAYMENT_LABELS[hoveredBooking.paymentStatus]}
                 </span>
               </div>
-              {hoveredBooking.totalAmount && (
-                <span className="font-semibold text-stone-900">{hoveredBooking.totalAmount.toFixed(2)} EUR</span>
-              )}
+              <div className="text-right">
+                {hoveredBooking.totalAmount && (
+                  <span className="font-semibold text-stone-900">{hoveredBooking.totalAmount.toFixed(2)} EUR</span>
+                )}
+                {hoveredBooking.hasCustomHufPrice && hoveredBooking.customHufPrice && (
+                  <div className="text-xs font-medium text-purple-700">
+                    {hoveredBooking.customHufPrice.toLocaleString()} Ft
+                  </div>
+                )}
+              </div>
             </div>
+            {hoveredBooking.hasCustomHufPrice && hoveredBooking.customHufPrice && (
+              <div className="mt-2 px-2 py-1 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700">
+                <span className="font-medium">Custom HUF price</span> – manually agreed amount
+              </div>
+            )}
           </div>
 
           <p className="mt-2 text-xs text-amber-600">Click to view details & manage</p>

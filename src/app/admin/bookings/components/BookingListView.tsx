@@ -509,9 +509,16 @@ export default function BookingListView({
                           {booking.guestCount}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className="font-medium text-stone-900">
-                            {booking.totalAmount ? `${booking.totalAmount.toFixed(2)} €` : '-'}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="font-medium text-stone-900">
+                              {booking.totalAmount ? `${booking.totalAmount.toFixed(2)} €` : '-'}
+                            </span>
+                            {booking.hasCustomHufPrice && booking.customHufPrice && (
+                              <span className="text-xs text-purple-700 font-medium mt-0.5">
+                                {booking.customHufPrice.toLocaleString()} Ft
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
@@ -530,6 +537,14 @@ export default function BookingListView({
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
+                            {booking.hasCustomHufPrice && booking.customHufPrice && (
+                              <span
+                                title="Custom HUF price agreed"
+                                className="px-1.5 py-0.5 text-xs font-bold bg-purple-100 text-purple-700 rounded"
+                              >
+                                HUF
+                              </span>
+                            )}
                             {booking.notes && (
                               <span title="Has notes">
                                 <svg
@@ -683,11 +698,21 @@ export default function BookingListView({
                                     )}
 
                                     {/* Total */}
-                                    <div className="border-t border-stone-300 pt-2 flex justify-between font-medium">
-                                      <span className="text-stone-900">Total</span>
-                                      <span className="text-stone-900">
-                                        {expandedDetails.priceBreakdown.grandTotal.toFixed(2)} €
-                                      </span>
+                                    <div className="border-t border-stone-300 pt-2">
+                                      <div className="flex justify-between font-medium">
+                                        <span className="text-stone-900">Total (EUR)</span>
+                                        <span className="text-stone-900">
+                                          {expandedDetails.priceBreakdown.grandTotal.toFixed(2)} €
+                                        </span>
+                                      </div>
+                                      {booking.hasCustomHufPrice && booking.customHufPrice && (
+                                        <div className="flex justify-between font-medium mt-1 pt-1 border-t border-purple-200">
+                                          <span className="text-purple-700">Custom HUF Price</span>
+                                          <span className="text-purple-700">
+                                            {booking.customHufPrice.toLocaleString()} Ft
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -735,11 +760,23 @@ export default function BookingListView({
                                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}>
                                         {PAYMENT_LABELS[booking.paymentStatus]}
                                       </span>
-                                      <span className="text-sm font-medium text-stone-900">
-                                        {booking.totalAmount?.toFixed(2) || '0.00'} €
-                                      </span>
+                                      <div className="text-right">
+                                        <span className="text-sm font-medium text-stone-900">
+                                          {booking.totalAmount?.toFixed(2) || '0.00'} €
+                                        </span>
+                                        {booking.hasCustomHufPrice && booking.customHufPrice && (
+                                          <div className="text-xs font-medium text-purple-700">
+                                            {booking.customHufPrice.toLocaleString()} Ft
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <p className="text-xs text-stone-500">
+                                    {booking.hasCustomHufPrice && booking.customHufPrice && (
+                                      <div className="mt-2 px-2 py-1.5 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700">
+                                        <span className="font-medium">Custom HUF price</span> – manually agreed amount
+                                      </div>
+                                    )}
+                                    <p className="text-xs text-stone-500 mt-1">
                                       Click Edit to manage payments
                                     </p>
                                   </div>

@@ -38,6 +38,8 @@ export async function GET(
       select: {
         id: true,
         totalAmount: true,
+        hasCustomHufPrice: true,
+        customHufPrice: true,
         paymentStatus: true,
         payments: {
           orderBy: { date: 'desc' },
@@ -49,14 +51,29 @@ export async function GET(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    const totalPaid = booking.payments.reduce((sum, p) => sum + p.amount, 0)
-    const remaining = (booking.totalAmount || 0) - totalPaid
+    // Calculate totals by currency
+    const paidEur = booking.payments
+      .filter((p) => p.currency === 'EUR')
+      .reduce((sum, p) => sum + p.amount, 0)
+    const paidHuf = booking.payments
+      .filter((p) => p.currency === 'HUF')
+      .reduce((sum, p) => sum + p.amount, 0)
+
+    // Legacy totalPaid for backwards compatibility (EUR only)
+    const totalPaid = paidEur
+
+    // Calculate remaining based on EUR price
+    const remaining = (booking.totalAmount || 0) - paidEur
 
     return NextResponse.json({
       payments: booking.payments,
       summary: {
         totalAmount: booking.totalAmount,
+        hasCustomHufPrice: booking.hasCustomHufPrice,
+        customHufPrice: booking.customHufPrice,
         totalPaid,
+        paidEur,
+        paidHuf,
         remaining: remaining > 0 ? remaining : 0,
         paymentStatus: booking.paymentStatus,
       },
