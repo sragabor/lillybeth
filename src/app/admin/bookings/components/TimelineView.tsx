@@ -158,6 +158,10 @@ export default function TimelineView({
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)
 
+  // Loading state for drag & drop updates
+  const [updatingBookingIds, setUpdatingBookingIds] = useState<Set<string>>(new Set())
+  const isUpdating = updatingBookingIds.size > 0
+
   // Drag & drop price change warning
   const [showDragWarningModal, setShowDragWarningModal] = useState(false)
   const [pendingDrop, setPendingDrop] = useState<{
@@ -340,6 +344,11 @@ export default function TimelineView({
 
   // Drag and drop handlers
   const handleDragStart = (booking: TimelineBooking, e: React.DragEvent) => {
+    // Prevent drag if an update is in progress
+    if (isUpdating) {
+      e.preventDefault()
+      return
+    }
     setDraggingBooking(booking)
     setHoveredBooking(null)
     setHoveredGroupId(null)
@@ -474,6 +483,9 @@ export default function TimelineView({
     newPrice?: number,
     additionalPrices?: { title: string; priceEur: number; quantity: number }[]
   ) => {
+    // Set loading state for this booking
+    setUpdatingBookingIds(new Set([bookingId]))
+
     try {
       const updateData: Record<string, unknown> = {
         roomId,
@@ -505,6 +517,7 @@ export default function TimelineView({
     } catch (error) {
       console.error('Error moving booking:', error)
     } finally {
+      setUpdatingBookingIds(new Set())
       setDraggingBooking(null)
       setDragOverRoom(null)
       setDragOverDate(null)
@@ -520,6 +533,10 @@ export default function TimelineView({
     checkIn: string,
     checkOut: string
   ) => {
+    // Set loading state for all bookings in the group
+    const siblingIds = timelineData?.groupSiblings[groupId] || []
+    setUpdatingBookingIds(new Set(siblingIds))
+
     try {
       const res = await fetch(`/api/admin/booking-groups/${groupId}`, {
         method: 'PUT',
@@ -536,6 +553,43 @@ export default function TimelineView({
     } catch (error) {
       console.error('Error moving group booking:', error)
     } finally {
+      setUpdatingBookingIds(new Set())
+      setDraggingBooking(null)
+      setDragOverRoom(null)
+      setDragOverDate(null)
+      setDraggingGroupId(null)
+    }
+  }
+
+  // Execute room change for a booking within a group (Y-axis movement)
+  const executeGroupRoomChange = async (
+    groupId: string,
+    bookingId: string,
+    newRoomId: string
+  ) => {
+    // Set loading state for this booking
+    setUpdatingBookingIds(new Set([bookingId]))
+
+    try {
+      const res = await fetch(`/api/admin/booking-groups/${groupId}/rooms`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId,
+          roomId: newRoomId,
+        }),
+      })
+
+      if (res.ok) {
+        fetchTimelineData()
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to change room assignment')
+      }
+    } catch (error) {
+      console.error('Error changing room in group:', error)
+    } finally {
+      setUpdatingBookingIds(new Set())
       setDraggingBooking(null)
       setDragOverRoom(null)
       setDragOverDate(null)
@@ -1027,7 +1081,7 @@ export default function TimelineView({
                         width: DAY_WIDTH,
                         height: ROOM_HEIGHT,
                       }}
-                      onClick={() => !readOnly && !draggingBooking && !isDisabled && openCreateBooking(row.room.id, dateStr)}
+                      onClick={() => !readOnly && !draggingBooking && !isDisabled && !isUpdating && openCreateBooking(row.room.id, dateStr)}
                       onDragOver={(e) => !readOnly && !isDisabled && handleDragOver(row.room.id, dateStr, e)}
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => !readOnly && !isDisabled && handleDrop(row.room.id, dateStr, e)}
@@ -1054,12 +1108,21 @@ export default function TimelineView({
                   const isSiblingHighlighted = isGroupSibling(booking.id)
                   const isSiblingDragging = isDraggingAsSibling(booking.id)
                   const isGrouped = booking.isGrouped || !!booking.groupId
+                  const isBookingUpdating = updatingBookingIds.has(booking.id)
 
                   return (
                     <div
                       key={booking.id}
-                      draggable={!readOnly}
-                      className={`absolute rounded-lg border-2 ${colors.bg} ${colors.border} ${statusClass} ${readOnly ? 'cursor-default' : 'cursor-grab'} transition-all hover:shadow-lg hover:z-10 ${
+                      draggable={!readOnly && !isUpdating}
+                      className={`absolute rounded-lg border-2 ${colors.bg} ${colors.border} ${statusClass} ${
+                        isBookingUpdating
+                          ? 'animate-pulse cursor-wait pointer-events-none z-30'
+                          : isUpdating
+                            ? 'opacity-50 cursor-wait'
+                            : readOnly
+                              ? 'cursor-default'
+                              : 'cursor-grab'
+                      } transition-all hover:shadow-lg hover:z-10 ${
                         isDragging || isSiblingDragging ? 'opacity-50 cursor-grabbing' : ''
                       } ${isSiblingHighlighted ? 'ring-2 ring-indigo-500 ring-offset-1 z-20' : ''} ${isGrouped ? 'border-l-4 border-l-indigo-500' : ''}`}
                       style={{
@@ -1070,14 +1133,25 @@ export default function TimelineView({
                       }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (!readOnly && !draggingBooking) openEditBooking(booking)
+                        if (!readOnly && !draggingBooking && !isUpdating) openEditBooking(booking)
                       }}
                       onDragStart={(e) => !readOnly && handleDragStart(booking, e)}
                       onDragEnd={handleDragEnd}
-                      onMouseEnter={(e) => handleBookingHover(booking, e)}
+                      onMouseEnter={(e) => !isUpdating && handleBookingHover(booking, e)}
                       onMouseLeave={handleBookingLeave}
                     >
-                      {viewMode === 'monthly' ? (
+                      {isBookingUpdating ? (
+                        /* Loading state */
+                        <div className="h-full flex items-center justify-center gap-2 bg-white/60 rounded-lg">
+                          <svg className="animate-spin h-4 w-4 text-stone-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          {viewMode !== 'monthly' && (
+                            <span className="text-xs text-stone-600 font-medium">Updating...</span>
+                          )}
+                        </div>
+                      ) : viewMode === 'monthly' ? (
                         /* Compact monthly view */
                         <div className="h-full px-1 flex items-center gap-1 overflow-hidden">
                           {isGrouped && (

@@ -55,6 +55,55 @@ interface ListItem {
   additionalPrices?: { id: string; title: string; priceEur: number; quantity: number }[]
 }
 
+// Helper to check if a date is weekend (Friday or Saturday night)
+function isWeekendNight(date: Date): boolean {
+  const day = date.getDay()
+  return day === 5 || day === 6
+}
+
+// Helper to calculate accommodation total for a room booking
+function calculateAccommodationTotal(
+  checkIn: Date,
+  checkOut: Date,
+  dateRangePrices: { startDate: Date; endDate: Date; weekdayPrice: number; weekendPrice: number; isInactive: boolean }[],
+  calendarOverrides: { date: Date; price: number | null }[]
+): number {
+  let accommodationTotal = 0
+  const current = new Date(checkIn)
+
+  while (current < checkOut) {
+    const dateStr = current.toISOString().split('T')[0]
+    const isWeekend = isWeekendNight(current)
+
+    // Check for calendar override first
+    const override = calendarOverrides.find(
+      (o) => o.date.toISOString().split('T')[0] === dateStr && o.price !== null
+    )
+
+    let price = 0
+
+    if (override && override.price !== null) {
+      price = override.price
+    } else {
+      // Find applicable date range
+      const dateRange = dateRangePrices.find((dr) => {
+        const start = new Date(dr.startDate)
+        const end = new Date(dr.endDate)
+        return current >= start && current <= end && !dr.isInactive
+      })
+
+      if (dateRange) {
+        price = isWeekend ? dateRange.weekendPrice : dateRange.weekdayPrice
+      }
+    }
+
+    accommodationTotal += price
+    current.setDate(current.getDate() + 1)
+  }
+
+  return accommodationTotal
+}
+
 // GET bookings list with filtering, sorting, and pagination
 // Returns both standalone bookings and booking groups in a unified format
 export async function GET(request: NextRequest) {
@@ -199,7 +248,7 @@ export async function GET(request: NextRequest) {
       orderBy,
     })
 
-    // Fetch booking groups
+    // Fetch booking groups with full pricing data for accurate total calculation
     const bookingGroups = await prisma.bookingGroup.findMany({
       where: groupWhere,
       include: {
@@ -215,6 +264,8 @@ export async function GET(request: NextRequest) {
                     id: true,
                     name: true,
                     building: { select: { id: true, name: true } },
+                    dateRangePrices: true,
+                    calendarOverrides: true,
                   },
                 },
               },
@@ -261,12 +312,57 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Add booking groups
+    // Add booking groups with calculated totals
     for (const group of bookingGroups) {
       const checkIn = new Date(group.checkIn)
       const checkOut = new Date(group.checkOut)
       const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
       const totalGuests = group.bookings.reduce((sum, b) => sum + b.guestCount, 0)
+
+      // Calculate totals on-the-fly to ensure accuracy
+      // This prevents stale/partial data from being displayed
+      let calculatedGroupTotal = 0
+
+      const bookingsWithCalculatedTotals = group.bookings.map((b) => {
+        // Calculate accommodation for this room
+        const accommodationTotal = b.room.roomType
+          ? calculateAccommodationTotal(
+              checkIn,
+              checkOut,
+              b.room.roomType.dateRangePrices,
+              b.room.roomType.calendarOverrides
+            )
+          : 0
+
+        // Calculate additional prices total
+        const additionalPricesTotal = b.additionalPrices.reduce(
+          (sum, p) => sum + p.priceEur * p.quantity,
+          0
+        )
+
+        // Room grand total = accommodation + additional prices
+        const roomGrandTotal = accommodationTotal + additionalPricesTotal
+        calculatedGroupTotal += roomGrandTotal
+
+        return {
+          id: b.id,
+          roomId: b.roomId,
+          guestCount: b.guestCount,
+          totalAmount: roomGrandTotal, // Use calculated total, not stored
+          room: {
+            id: b.room.id,
+            name: b.room.name,
+            roomType: b.room.roomType
+              ? {
+                  id: b.room.roomType.id,
+                  name: b.room.roomType.name,
+                  building: b.room.roomType.building,
+                }
+              : null,
+          },
+          additionalPrices: b.additionalPrices,
+        }
+      })
 
       items.push({
         type: 'group',
@@ -282,7 +378,7 @@ export async function GET(request: NextRequest) {
         status: group.status,
         paymentStatus: group.paymentStatus,
         notes: group.notes,
-        totalAmount: group.totalAmount,
+        totalAmount: calculatedGroupTotal > 0 ? calculatedGroupTotal : group.totalAmount, // Prefer calculated
         hasCustomHufPrice: group.hasCustomHufPrice,
         customHufPrice: group.customHufPrice,
         invoiceSent: group.invoiceSent,
@@ -290,14 +386,7 @@ export async function GET(request: NextRequest) {
         cleaned: group.cleaned,
         nights,
         roomCount: group.bookings.length,
-        bookings: group.bookings.map((b) => ({
-          id: b.id,
-          roomId: b.roomId,
-          guestCount: b.guestCount,
-          totalAmount: b.totalAmount,
-          room: b.room,
-          additionalPrices: b.additionalPrices,
-        })),
+        bookings: bookingsWithCalculatedTotals,
       })
     }
 

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getLocalizedText } from '@/lib/i18n/utils'
 import { useLanguage } from '@/contexts/LanguageContext'
 
-interface AdditionalPrice {
+interface ExistingAdditionalPrice {
   id: string
   title: string
   priceEur: number
@@ -36,7 +36,14 @@ interface RoomBooking {
       building: { id: string; name: string }
     } | null
   }
-  additionalPrices: AdditionalPrice[]
+  additionalPrices: ExistingAdditionalPrice[]
+}
+
+interface GroupData {
+  id: string
+  checkIn: string
+  checkOut: string
+  bookings: RoomBooking[]
 }
 
 interface RoomInGroupEditModalProps {
@@ -58,14 +65,40 @@ export default function RoomInGroupEditModal({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [roomBooking, setRoomBooking] = useState<RoomBooking | null>(null)
+  const [groupData, setGroupData] = useState<GroupData | null>(null)
   const [availablePrices, setAvailablePrices] = useState<AvailableAdditionalPrice[]>([])
 
-  // Form state
+  // Form state - only track which optional prices are selected (by source ID)
   const [guestCount, setGuestCount] = useState(1)
-  const [selectedPrices, setSelectedPrices] = useState<{ id: string; quantity: number }[]>([])
+  const [selectedPriceIds, setSelectedPriceIds] = useState<Set<string>>(new Set())
 
   // Error state
   const [error, setError] = useState<string | null>(null)
+
+  // Calculate nights from group dates
+  const nights = useMemo(() => {
+    if (!groupData) return 1
+    const checkIn = new Date(groupData.checkIn)
+    const checkOut = new Date(groupData.checkOut)
+    return Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)))
+  }, [groupData])
+
+  // Calculate quantity for a price based on rules
+  const calculateQuantity = (price: AvailableAdditionalPrice): number => {
+    let quantity = 1
+    if (price.perNight) {
+      quantity = nights
+    }
+    if (price.perGuest) {
+      quantity *= guestCount
+    }
+    return quantity
+  }
+
+  // Calculate total for a price
+  const calculatePriceTotal = (price: AvailableAdditionalPrice): number => {
+    return price.priceEur * calculateQuantity(price)
+  }
 
   // Fetch room booking data and available prices
   useEffect(() => {
@@ -81,7 +114,7 @@ export default function RoomInGroupEditModal({
     setError(null)
 
     try {
-      // Fetch group data to get room booking
+      // Fetch group data to get room booking and dates
       const groupRes = await fetch(`/api/admin/booking-groups/${groupId}`)
       if (!groupRes.ok) {
         setError('Failed to fetch group data')
@@ -89,9 +122,16 @@ export default function RoomInGroupEditModal({
         return
       }
 
-      const groupData = await groupRes.json()
-      const booking = groupData.group.bookings.find((b: RoomBooking) => b.id === bookingId)
+      const responseData = await groupRes.json()
+      const group = responseData.group
+      setGroupData({
+        id: group.id,
+        checkIn: group.checkIn,
+        checkOut: group.checkOut,
+        bookings: group.bookings,
+      })
 
+      const booking = group.bookings.find((b: RoomBooking) => b.id === bookingId)
       if (!booking) {
         setError('Room booking not found')
         setLoading(false)
@@ -101,13 +141,6 @@ export default function RoomInGroupEditModal({
       setRoomBooking(booking)
       setGuestCount(booking.guestCount)
 
-      // Map existing additional prices to selected state
-      const existingPrices = booking.additionalPrices.map((p: AdditionalPrice) => ({
-        id: p.id,
-        quantity: p.quantity,
-      }))
-      setSelectedPrices(existingPrices)
-
       // Fetch available additional prices for this room's building and room type
       if (booking.room.roomType) {
         const pricesRes = await fetch(
@@ -115,7 +148,24 @@ export default function RoomInGroupEditModal({
         )
         if (pricesRes.ok) {
           const pricesData = await pricesRes.json()
-          setAvailablePrices(pricesData.prices || [])
+          const prices = pricesData.prices || []
+          setAvailablePrices(prices)
+
+          // Match existing prices by title to determine which are selected
+          const existingTitles = new Set(booking.additionalPrices.map((p: ExistingAdditionalPrice) => p.title))
+          const selectedIds = new Set<string>()
+
+          prices.forEach((price: AvailableAdditionalPrice) => {
+            // Mandatory prices are always selected
+            if (price.mandatory) {
+              selectedIds.add(price.id)
+            } else if (existingTitles.has(price.title)) {
+              // Match optional prices by title
+              selectedIds.add(price.id)
+            }
+          })
+
+          setSelectedPriceIds(selectedIds)
         }
       }
     } catch (err) {
@@ -130,9 +180,10 @@ export default function RoomInGroupEditModal({
   useEffect(() => {
     if (!isOpen) {
       setRoomBooking(null)
+      setGroupData(null)
       setAvailablePrices([])
       setGuestCount(1)
-      setSelectedPrices([])
+      setSelectedPriceIds(new Set())
       setError(null)
     }
   }, [isOpen])
@@ -141,31 +192,18 @@ export default function RoomInGroupEditModal({
   const togglePrice = (price: AvailableAdditionalPrice) => {
     if (price.mandatory) return // Can't toggle mandatory prices
 
-    const existing = selectedPrices.find((p) => p.id === price.id)
-    if (existing) {
-      setSelectedPrices((prev) => prev.filter((p) => p.id !== price.id))
-    } else {
-      // Calculate default quantity
-      let quantity = 1
-      if (price.perNight && roomBooking) {
-        // Would need nights - for now default to 1
-        quantity = 1
+    setSelectedPriceIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(price.id)) {
+        newSet.delete(price.id)
+      } else {
+        newSet.add(price.id)
       }
-      if (price.perGuest) {
-        quantity = guestCount
-      }
-      setSelectedPrices((prev) => [...prev, { id: price.id, quantity }])
-    }
+      return newSet
+    })
   }
 
-  // Update quantity for a selected price
-  const updatePriceQuantity = (priceId: string, quantity: number) => {
-    setSelectedPrices((prev) =>
-      prev.map((p) => (p.id === priceId ? { ...p, quantity } : p))
-    )
-  }
-
-  // Handle save
+  // Handle save - send only selections, let backend calculate amounts
   const handleSave = async () => {
     if (!groupId || !bookingId) return
 
@@ -173,15 +211,13 @@ export default function RoomInGroupEditModal({
     setError(null)
 
     try {
-      // Build additional prices data
-      const additionalPricesData = selectedPrices.map((sp) => {
-        const priceInfo = availablePrices.find((ap) => ap.id === sp.id)
-        return {
-          title: priceInfo?.title || '',
-          priceEur: priceInfo?.priceEur || 0,
-          quantity: sp.quantity,
-        }
-      })
+      // Build selections array with sourceId and sourceType only
+      const additionalPriceSelections = availablePrices
+        .filter((price) => selectedPriceIds.has(price.id) || price.mandatory)
+        .map((price) => ({
+          sourceId: price.id,
+          sourceType: price.origin,
+        }))
 
       const res = await fetch(`/api/admin/booking-groups/${groupId}/rooms`, {
         method: 'PUT',
@@ -189,7 +225,7 @@ export default function RoomInGroupEditModal({
         body: JSON.stringify({
           bookingId,
           guestCount,
-          additionalPrices: additionalPricesData,
+          additionalPriceSelections, // Only IDs, no amounts
         }),
       })
 
@@ -211,6 +247,17 @@ export default function RoomInGroupEditModal({
   // Separate mandatory and optional prices
   const mandatoryPrices = availablePrices.filter((p) => p.mandatory)
   const optionalPrices = availablePrices.filter((p) => !p.mandatory)
+
+  // Calculate estimated room total for display
+  const estimatedTotal = useMemo(() => {
+    let total = 0
+    availablePrices.forEach((price) => {
+      if (selectedPriceIds.has(price.id) || price.mandatory) {
+        total += calculatePriceTotal(price)
+      }
+    })
+    return total
+  }, [availablePrices, selectedPriceIds, guestCount, nights])
 
   if (!isOpen) return null
 
@@ -258,7 +305,8 @@ export default function RoomInGroupEditModal({
             <div className="space-y-6">
               {/* Info banner */}
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-700">
-                <strong>Note:</strong> This room is part of a group booking. Dates and guest info are shared across all rooms in the group.
+                <strong>Note:</strong> This room is part of a group booking ({nights} night{nights > 1 ? 's' : ''}).
+                Dates and guest info are shared across all rooms in the group.
               </div>
 
               {/* Room Info */}
@@ -298,21 +346,28 @@ export default function RoomInGroupEditModal({
                 <div>
                   <h3 className="text-sm font-medium text-stone-700 mb-2">Mandatory Fees</h3>
                   <div className="space-y-2">
-                    {mandatoryPrices.map((price) => (
-                      <div
-                        key={price.id}
-                        className="flex items-center justify-between bg-amber-50 rounded-lg p-3 border border-amber-200"
-                      >
-                        <div>
-                          <span className="text-sm font-medium text-stone-900">{price.title}</span>
-                          <span className="text-xs text-stone-500 ml-2">
-                            {price.perNight && 'per night '}
-                            {price.perGuest && 'per guest'}
-                          </span>
+                    {mandatoryPrices.map((price) => {
+                      const quantity = calculateQuantity(price)
+                      const total = calculatePriceTotal(price)
+
+                      return (
+                        <div
+                          key={price.id}
+                          className="flex items-center justify-between bg-amber-50 rounded-lg p-3 border border-amber-200"
+                        >
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-stone-900">{price.title}</span>
+                            <div className="text-xs text-stone-500 mt-0.5">
+                              {price.priceEur.toFixed(2)} € × {quantity}
+                              {price.perNight && price.perGuest && ` (${nights} nights × ${guestCount} guests)`}
+                              {price.perNight && !price.perGuest && ` (${nights} nights)`}
+                              {!price.perNight && price.perGuest && ` (${guestCount} guests)`}
+                            </div>
+                          </div>
+                          <span className="text-sm font-medium text-amber-700">{total.toFixed(2)} €</span>
                         </div>
-                        <span className="text-sm font-medium text-amber-700">{price.priceEur.toFixed(2)} €</span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <p className="text-xs text-stone-500 mt-1">Mandatory fees are automatically applied</p>
                 </div>
@@ -324,8 +379,9 @@ export default function RoomInGroupEditModal({
                   <h3 className="text-sm font-medium text-stone-700 mb-2">Optional Extras</h3>
                   <div className="space-y-2">
                     {optionalPrices.map((price) => {
-                      const isSelected = selectedPrices.some((sp) => sp.id === price.id)
-                      const selectedPrice = selectedPrices.find((sp) => sp.id === price.id)
+                      const isSelected = selectedPriceIds.has(price.id)
+                      const quantity = calculateQuantity(price)
+                      const total = calculatePriceTotal(price)
 
                       return (
                         <div
@@ -344,31 +400,22 @@ export default function RoomInGroupEditModal({
                                 onChange={() => togglePrice(price)}
                                 className="rounded border-stone-300 text-indigo-600 focus:ring-indigo-500"
                               />
-                              <div>
+                              <div className="flex-1">
                                 <span className="text-sm font-medium text-stone-900">{price.title}</span>
-                                <span className="text-xs text-stone-500 ml-2">
-                                  {price.perNight && 'per night '}
-                                  {price.perGuest && 'per guest'}
-                                </span>
+                                {isSelected && (
+                                  <div className="text-xs text-stone-500 mt-0.5">
+                                    {price.priceEur.toFixed(2)} € × {quantity}
+                                    {price.perNight && price.perGuest && ` (${nights} nights × ${guestCount} guests)`}
+                                    {price.perNight && !price.perGuest && ` (${nights} nights)`}
+                                    {!price.perNight && price.perGuest && ` (${guestCount} guests)`}
+                                  </div>
+                                )}
                               </div>
                             </label>
-                            <span className="text-sm font-medium text-stone-700">{price.priceEur.toFixed(2)} €</span>
+                            <span className={`text-sm font-medium ${isSelected ? 'text-indigo-700' : 'text-stone-500'}`}>
+                              {isSelected ? `${total.toFixed(2)} €` : `${price.priceEur.toFixed(2)} €/unit`}
+                            </span>
                           </div>
-                          {isSelected && (
-                            <div className="mt-2 pl-7 flex items-center gap-2">
-                              <label className="text-xs text-stone-500">Quantity:</label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={selectedPrice?.quantity || 1}
-                                onChange={(e) => updatePriceQuantity(price.id, parseInt(e.target.value) || 1)}
-                                className="w-20 px-2 py-1 border border-stone-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                              />
-                              <span className="text-xs text-indigo-600 font-medium">
-                                = {((selectedPrice?.quantity || 1) * price.priceEur).toFixed(2)} €
-                              </span>
-                            </div>
-                          )}
                         </div>
                       )
                     })}
@@ -379,6 +426,19 @@ export default function RoomInGroupEditModal({
               {availablePrices.length === 0 && (
                 <div className="text-sm text-stone-500 text-center py-4">
                   No additional prices configured for this room type
+                </div>
+              )}
+
+              {/* Estimated Total */}
+              {availablePrices.length > 0 && (
+                <div className="bg-stone-100 rounded-lg p-4 border border-stone-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-stone-700">Estimated Additional Fees Total</span>
+                    <span className="text-lg font-semibold text-stone-900">{estimatedTotal.toFixed(2)} €</span>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">
+                    Final amounts are calculated server-side based on pricing rules
+                  </p>
                 </div>
               )}
             </div>

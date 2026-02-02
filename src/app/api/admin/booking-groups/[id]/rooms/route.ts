@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { calculateNights, recalculateAndPersistRoomTotal } from '@/lib/pricing'
+
+// Helper to get localized text from JSON field
+function getLocalizedTitle(title: unknown): string {
+  if (typeof title === 'object' && title !== null) {
+    const titleObj = title as Record<string, string>
+    return titleObj.en || titleObj.hu || ''
+  }
+  return String(title || '')
+}
+
+// Interface for price selection from client
+interface PriceSelection {
+  sourceId: string
+  sourceType: 'building' | 'roomType'
+}
 
 // POST add a room to a booking group
 export async function POST(
@@ -128,7 +144,7 @@ export async function POST(
   }
 }
 
-// PUT update a room booking within a group (room assignment, guest count)
+// PUT update a room booking within a group (room assignment, guest count, additional prices)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -142,16 +158,31 @@ export async function PUT(
 
   try {
     const data = await request.json()
-    const { bookingId, roomId, guestCount, additionalPrices } = data
+    const { bookingId, roomId, guestCount, additionalPriceSelections } = data
 
     if (!bookingId) {
       return NextResponse.json({ error: 'bookingId is required' }, { status: 400 })
     }
 
-    // Verify group exists
+    // Verify group exists with full details
     const group = await prisma.bookingGroup.findUnique({
       where: { id: groupId },
-      include: { bookings: true },
+      include: {
+        bookings: {
+          include: {
+            additionalPrices: true,
+            room: {
+              include: {
+                roomType: {
+                  include: {
+                    building: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     })
 
     if (!group) {
@@ -165,6 +196,7 @@ export async function PUT(
     }
 
     const updateData: Record<string, unknown> = {}
+    const finalGuestCount = guestCount !== undefined ? guestCount : booking.guestCount
 
     // Handle room change
     if (roomId && roomId !== booking.roomId) {
@@ -219,27 +251,60 @@ export async function PUT(
       updateData.guestCount = guestCount
     }
 
-    // Handle additional prices update
-    if (additionalPrices !== undefined) {
+    // Handle additional prices update with server-side calculation
+    if (additionalPriceSelections !== undefined) {
+      const nights = calculateNights(new Date(group.checkIn), new Date(group.checkOut))
+
       // Delete existing additional prices for this booking
       await prisma.bookingAdditionalPrice.deleteMany({
         where: { bookingId },
       })
 
-      // Create new additional prices if provided
-      if (additionalPrices && additionalPrices.length > 0) {
-        await prisma.bookingAdditionalPrice.createMany({
-          data: additionalPrices.map((price: { title: string; priceEur: number; quantity: number }) => ({
+      // Process each selection - fetch from source and calculate
+      const priceSelections = additionalPriceSelections as PriceSelection[]
+
+      for (const selection of priceSelections) {
+        let sourceDef = null
+
+        // Fetch the price definition from the appropriate source table
+        if (selection.sourceType === 'building') {
+          sourceDef = await prisma.buildingAdditionalPrice.findUnique({
+            where: { id: selection.sourceId },
+          })
+        } else if (selection.sourceType === 'roomType') {
+          sourceDef = await prisma.roomTypeAdditionalPrice.findUnique({
+            where: { id: selection.sourceId },
+          })
+        }
+
+        if (!sourceDef) {
+          console.warn(`Price definition not found: ${selection.sourceType}/${selection.sourceId}`)
+          continue
+        }
+
+        // Calculate quantity based on rules
+        let quantity = 1
+        if (sourceDef.perNight) {
+          quantity = nights
+        }
+        if (sourceDef.perGuest) {
+          quantity *= finalGuestCount
+        }
+
+        // Create with server-calculated values
+        await prisma.bookingAdditionalPrice.create({
+          data: {
             bookingId,
-            title: price.title,
-            priceEur: price.priceEur,
-            quantity: price.quantity || 1,
-          })),
+            title: getLocalizedTitle(sourceDef.title),
+            priceEur: sourceDef.priceEur,
+            quantity,
+          },
         })
       }
+
     }
 
-    // Update the booking
+    // Update the booking (without totalAmount - will be calculated by pricing service)
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: updateData,
@@ -257,7 +322,17 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json({ booking: updatedBooking })
+    // Use unified pricing service to recalculate and persist correct totals
+    // This includes BOTH accommodation AND additional prices
+    const { roomTotal, groupTotal } = await recalculateAndPersistRoomTotal(bookingId, groupId)
+
+    return NextResponse.json({
+      booking: {
+        ...updatedBooking,
+        totalAmount: roomTotal, // Return the correctly calculated total
+      },
+      groupTotal,
+    })
   } catch (error) {
     console.error('Error updating room in group:', error)
     return NextResponse.json({ error: 'Failed to update room in group' }, { status: 500 })
@@ -345,19 +420,20 @@ export async function DELETE(
     }
 
     // More than 2 rooms: just remove the booking
-    const removedAmount = booking.totalAmount || 0
-
     // Delete the booking
     await prisma.booking.delete({ where: { id: bookingId } })
 
-    // Update group total
-    const newGroupTotal = (group.totalAmount || 0) - removedAmount
+    // Use unified pricing service to recalculate group total
+    // Import dynamically to avoid circular dependency issues
+    const { calculateGroupPricing } = await import('@/lib/pricing')
+    const groupPricing = await calculateGroupPricing(groupId)
+
     await prisma.bookingGroup.update({
       where: { id: groupId },
-      data: { totalAmount: newGroupTotal > 0 ? newGroupTotal : null },
+      data: { totalAmount: groupPricing.groupGrandTotal > 0 ? groupPricing.groupGrandTotal : null },
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, groupTotal: groupPricing.groupGrandTotal })
   } catch (error) {
     console.error('Error removing room from group:', error)
     return NextResponse.json({ error: 'Failed to remove room from group' }, { status: 500 })

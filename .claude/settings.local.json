@@ -20,7 +20,8 @@
       "Bash(npx tsc:*)",
       "Bash(npx next lint)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_q3RXJBS0OKkH@ep-sparkling-cherry-ahrvpz0r-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx prisma generate:*)",
-      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_q3RXJBS0OKkH@ep-sparkling-cherry-ahrvpz0r-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx prisma db push:*)"
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_q3RXJBS0OKkH@ep-sparkling-cherry-ahrvpz0r-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx prisma db push:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_q3RXJBS0OKkH@ep-sparkling-cherry-ahrvpz0r-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" npm run build:*)"
     ]
   }
 }
