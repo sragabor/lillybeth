@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { PaymentMethod, PaymentStatus, PaymentCurrency } from '@/generated/prisma'
 
-// Helper function to calculate payment status based on payments vs total amount
+// Helper function to calculate payment status
 function calculatePaymentStatus(totalPaid: number, totalAmount: number | null): PaymentStatus {
   if (totalAmount === null || totalAmount <= 0) {
     return totalPaid > 0 ? 'FULLY_PAID' : 'PENDING'
@@ -20,7 +20,7 @@ function calculatePaymentStatus(totalPaid: number, totalAmount: number | null): 
   return 'PARTIALLY_PAID'
 }
 
-// GET all payments for a booking
+// GET all payments for a booking group
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -30,11 +30,11 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id } = await params
+  const { id: groupId } = await params
 
   try {
-    const booking = await prisma.booking.findUnique({
-      where: { id },
+    const group = await prisma.bookingGroup.findUnique({
+      where: { id: groupId },
       select: {
         id: true,
         totalAmount: true,
@@ -47,44 +47,40 @@ export async function GET(
       },
     })
 
-    if (!booking) {
-      return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    if (!group) {
+      return NextResponse.json({ error: 'Booking group not found' }, { status: 404 })
     }
 
     // Calculate totals by currency
-    const paidEur = booking.payments
+    const paidEur = group.payments
       .filter((p) => p.currency === 'EUR')
       .reduce((sum, p) => sum + p.amount, 0)
-    const paidHuf = booking.payments
+    const paidHuf = group.payments
       .filter((p) => p.currency === 'HUF')
       .reduce((sum, p) => sum + p.amount, 0)
 
-    // Legacy totalPaid for backwards compatibility (EUR only)
-    const totalPaid = paidEur
-
-    // Calculate remaining based on EUR price
-    const remaining = (booking.totalAmount || 0) - paidEur
+    const remaining = (group.totalAmount || 0) - paidEur
 
     return NextResponse.json({
-      payments: booking.payments,
+      payments: group.payments,
       summary: {
-        totalAmount: booking.totalAmount,
-        hasCustomHufPrice: booking.hasCustomHufPrice,
-        customHufPrice: booking.customHufPrice,
-        totalPaid,
+        totalAmount: group.totalAmount,
+        hasCustomHufPrice: group.hasCustomHufPrice,
+        customHufPrice: group.customHufPrice,
+        totalPaid: paidEur,
         paidEur,
         paidHuf,
         remaining: remaining > 0 ? remaining : 0,
-        paymentStatus: booking.paymentStatus,
+        paymentStatus: group.paymentStatus,
       },
     })
   } catch (error) {
-    console.error('Error fetching payments:', error)
+    console.error('Error fetching group payments:', error)
     return NextResponse.json({ error: 'Failed to fetch payments' }, { status: 500 })
   }
 }
 
-// POST create a new payment
+// POST create a new payment for a booking group
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -94,7 +90,7 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id } = await params
+  const { id: groupId } = await params
 
   try {
     const data = await request.json()
@@ -110,7 +106,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
     }
 
-    // Validate currency (default to EUR if not provided)
+    // Validate currency
     const currency = data.currency || 'EUR'
     if (!['EUR', 'HUF'].includes(currency)) {
       return NextResponse.json({ error: 'Invalid currency' }, { status: 400 })
@@ -121,20 +117,19 @@ export async function POST(
       return NextResponse.json({ error: 'Payment date is required' }, { status: 400 })
     }
 
-    // Parse date at noon UTC to avoid timezone issues with @db.Date
     const paymentDate = new Date(data.date + 'T12:00:00Z')
     if (isNaN(paymentDate.getTime())) {
       return NextResponse.json({ error: 'Invalid payment date format' }, { status: 400 })
     }
 
-    // Verify booking exists
-    const booking = await prisma.booking.findUnique({
-      where: { id },
+    // Verify group exists
+    const group = await prisma.bookingGroup.findUnique({
+      where: { id: groupId },
       include: { payments: true },
     })
 
-    if (!booking) {
-      return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    if (!group) {
+      return NextResponse.json({ error: 'Booking group not found' }, { status: 404 })
     }
 
     // Create the payment
@@ -145,18 +140,21 @@ export async function POST(
         method: data.method as PaymentMethod,
         date: paymentDate,
         note: data.note || null,
-        bookingId: id,
+        groupId,
       },
     })
 
-    // Calculate new total paid and update payment status
-    const totalPaid = booking.payments.reduce((sum, p) => sum + p.amount, 0) + payment.amount
-    const newPaymentStatus = calculatePaymentStatus(totalPaid, booking.totalAmount)
+    // Calculate new total paid (EUR only for status calculation)
+    const totalPaidEur = group.payments
+      .filter((p) => p.currency === 'EUR')
+      .reduce((sum, p) => sum + p.amount, 0) + (currency === 'EUR' ? amount : 0)
 
-    // Update booking payment status if changed
-    if (newPaymentStatus !== booking.paymentStatus) {
-      await prisma.booking.update({
-        where: { id },
+    const newPaymentStatus = calculatePaymentStatus(totalPaidEur, group.totalAmount)
+
+    // Update group payment status if changed
+    if (newPaymentStatus !== group.paymentStatus) {
+      await prisma.bookingGroup.update({
+        where: { id: groupId },
         data: { paymentStatus: newPaymentStatus },
       })
     }
@@ -164,17 +162,15 @@ export async function POST(
     return NextResponse.json({
       payment,
       paymentStatus: newPaymentStatus,
-      totalPaid,
+      totalPaid: totalPaidEur,
     })
   } catch (error) {
-    console.error('Error creating payment:', error)
-    // Return more specific error message if available
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create payment'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    console.error('Error creating group payment:', error)
+    return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
   }
 }
 
-// DELETE a payment
+// DELETE a payment from a booking group
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -184,46 +180,43 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id: bookingId } = await params
+  const { id: groupId } = await params
+  const { searchParams } = new URL(request.url)
+  const paymentId = searchParams.get('paymentId')
+
+  if (!paymentId) {
+    return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 })
+  }
 
   try {
-    const { searchParams } = new URL(request.url)
-    const paymentId = searchParams.get('paymentId')
-
-    if (!paymentId) {
-      return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 })
-    }
-
-    // Verify payment belongs to this booking
+    // Verify payment belongs to this group
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
-        booking: {
+        group: {
           include: { payments: true },
         },
       },
     })
 
-    if (!payment || payment.bookingId !== bookingId || !payment.booking) {
+    if (!payment || payment.groupId !== groupId) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
-
-    const booking = payment.booking
 
     // Delete the payment
     await prisma.payment.delete({ where: { id: paymentId } })
 
     // Recalculate total paid (excluding deleted payment)
-    const totalPaid = booking.payments
-      .filter((p) => p.id !== paymentId)
+    const totalPaidEur = payment.group!.payments
+      .filter((p) => p.id !== paymentId && p.currency === 'EUR')
       .reduce((sum, p) => sum + p.amount, 0)
 
-    const newPaymentStatus = calculatePaymentStatus(totalPaid, booking.totalAmount)
+    const newPaymentStatus = calculatePaymentStatus(totalPaidEur, payment.group!.totalAmount)
 
-    // Update booking payment status if changed
-    if (newPaymentStatus !== booking.paymentStatus) {
-      await prisma.booking.update({
-        where: { id: bookingId },
+    // Update group payment status if changed
+    if (newPaymentStatus !== payment.group!.paymentStatus) {
+      await prisma.bookingGroup.update({
+        where: { id: groupId },
         data: { paymentStatus: newPaymentStatus },
       })
     }
@@ -231,10 +224,10 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       paymentStatus: newPaymentStatus,
-      totalPaid,
+      totalPaid: totalPaidEur,
     })
   } catch (error) {
-    console.error('Error deleting payment:', error)
+    console.error('Error deleting group payment:', error)
     return NextResponse.json({ error: 'Failed to delete payment' }, { status: 500 })
   }
 }

@@ -19,13 +19,29 @@ import BookingModal from './BookingModal'
 import { getLocalizedText } from '@/lib/i18n/utils'
 import { useLanguage } from '@/contexts/LanguageContext'
 
+// Extended booking type with group info from timeline API
+interface TimelineBooking extends Booking {
+  isGrouped?: boolean
+  groupRoomCount?: number
+  groupId?: string | null
+  group?: {
+    id: string
+    guestName: string
+    totalAmount: number | null
+    hasCustomHufPrice: boolean
+    customHufPrice: number | null
+    _count: { bookings: number }
+  } | null
+}
+
 interface TimelineData {
   buildings: Building[]
-  bookings: Booking[]
-  bookingsByRoom: Record<string, Booking[]>
+  bookings: TimelineBooking[]
+  bookingsByRoom: Record<string, TimelineBooking[]>
   roomToRoomType: Record<string, string>
   inactiveDaysByRoomType: Record<string, string[]>
   specialDays: Record<string, string>
+  groupSiblings: Record<string, string[]> // groupId -> array of bookingIds
 }
 
 type TimelineRow =
@@ -121,8 +137,14 @@ export default function TimelineView({
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   // Hover state
-  const [hoveredBooking, setHoveredBooking] = useState<Booking | null>(null)
+  const [hoveredBooking, setHoveredBooking] = useState<TimelineBooking | null>(null)
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 })
+
+  // Group hover state for visual linking
+  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null)
+
+  // Group drag state - track when dragging a grouped booking
+  const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null)
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -132,7 +154,7 @@ export default function TimelineView({
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([])
 
   // Drag and drop state
-  const [draggingBooking, setDraggingBooking] = useState<Booking | null>(null)
+  const [draggingBooking, setDraggingBooking] = useState<TimelineBooking | null>(null)
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)
 
@@ -284,16 +306,47 @@ export default function TimelineView({
   }
 
   // Handle hover
-  const handleBookingHover = (booking: Booking, e: React.MouseEvent) => {
+  const handleBookingHover = (booking: TimelineBooking, e: React.MouseEvent) => {
     if (draggingBooking) return
     setHoveredBooking(booking)
     setHoverPosition({ x: e.clientX, y: e.clientY })
+    // Track hovered group for visual linking
+    if (booking.groupId) {
+      setHoveredGroupId(booking.groupId)
+    }
+  }
+
+  const handleBookingLeave = () => {
+    setHoveredBooking(null)
+    setHoveredGroupId(null)
+  }
+
+  // Check if a booking is a sibling of the hovered or dragging group
+  const isGroupSibling = (bookingId: string): boolean => {
+    if (!timelineData?.groupSiblings) return false
+    // Check both hovered and dragging group
+    const activeGroupId = draggingGroupId || hoveredGroupId
+    if (!activeGroupId) return false
+    const siblings = timelineData.groupSiblings[activeGroupId]
+    return siblings?.includes(bookingId) || false
+  }
+
+  // Check if a booking is being dragged as part of a group
+  const isDraggingAsSibling = (bookingId: string): boolean => {
+    if (!draggingGroupId || !timelineData?.groupSiblings) return false
+    const siblings = timelineData.groupSiblings[draggingGroupId]
+    return siblings?.includes(bookingId) || false
   }
 
   // Drag and drop handlers
-  const handleDragStart = (booking: Booking, e: React.DragEvent) => {
+  const handleDragStart = (booking: TimelineBooking, e: React.DragEvent) => {
     setDraggingBooking(booking)
     setHoveredBooking(null)
+    setHoveredGroupId(null)
+    // Track group dragging for sibling highlighting
+    if (booking.groupId) {
+      setDraggingGroupId(booking.groupId)
+    }
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', booking.id)
   }
@@ -302,6 +355,7 @@ export default function TimelineView({
     setDraggingBooking(null)
     setDragOverRoom(null)
     setDragOverDate(null)
+    setDraggingGroupId(null)
   }
 
   const handleDragOver = (roomId: string, date: string, e: React.DragEvent) => {
@@ -330,6 +384,31 @@ export default function TimelineView({
 
     const newCheckInStr = newCheckIn.toISOString().split('T')[0]
     const newCheckOutStr = newCheckOut.toISOString().split('T')[0]
+
+    // Handle grouped booking drag
+    if (draggingBooking.groupId) {
+      const isRoomChange = roomId !== draggingBooking.roomId
+      const isDateChange = newCheckInStr !== draggingBooking.checkIn.split('T')[0]
+
+      if (isRoomChange) {
+        // Y-axis movement: update individual booking's room assignment
+        await executeGroupRoomChange(draggingBooking.groupId, draggingBooking.id, roomId)
+      }
+
+      if (isDateChange) {
+        // Date change: update all bookings in the group
+        await executeGroupDrop(draggingBooking.groupId, newCheckInStr, newCheckOutStr)
+      }
+
+      // If only room change (no date change), we're done after room change
+      if (isRoomChange && !isDateChange) {
+        setDraggingBooking(null)
+        setDragOverRoom(null)
+        setDragOverDate(null)
+        setDraggingGroupId(null)
+      }
+      return
+    }
 
     // Extract existing additional price titles to preserve selections
     const selectedPriceTitles = draggingBooking.additionalPrices.map(p => p.title)
@@ -429,8 +508,38 @@ export default function TimelineView({
       setDraggingBooking(null)
       setDragOverRoom(null)
       setDragOverDate(null)
+      setDraggingGroupId(null)
       setPendingDrop(null)
       setShowDragWarningModal(false)
+    }
+  }
+
+  // Execute drop for grouped bookings - updates all rooms in group
+  const executeGroupDrop = async (
+    groupId: string,
+    checkIn: string,
+    checkOut: string
+  ) => {
+    try {
+      const res = await fetch(`/api/admin/booking-groups/${groupId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkIn, checkOut }),
+      })
+
+      if (res.ok) {
+        fetchTimelineData()
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to move group booking')
+      }
+    } catch (error) {
+      console.error('Error moving group booking:', error)
+    } finally {
+      setDraggingBooking(null)
+      setDragOverRoom(null)
+      setDragOverDate(null)
+      setDraggingGroupId(null)
     }
   }
 
@@ -641,6 +750,10 @@ export default function TimelineView({
                 <span className="text-stone-600">{SOURCE_LABELS[source as keyof typeof SOURCE_LABELS]}</span>
               </div>
             ))}
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-white border-2 border-stone-300 border-l-4 border-l-indigo-500" />
+              <span className="text-stone-600">Grouped</span>
+            </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded bg-red-200 border border-red-300" />
               <span className="text-stone-600">Inactive</span>
@@ -938,14 +1051,17 @@ export default function TimelineView({
                   if (left + width < 0 || left > dates.length * DAY_WIDTH) return null
 
                   const isDragging = draggingBooking?.id === booking.id
+                  const isSiblingHighlighted = isGroupSibling(booking.id)
+                  const isSiblingDragging = isDraggingAsSibling(booking.id)
+                  const isGrouped = booking.isGrouped || !!booking.groupId
 
                   return (
                     <div
                       key={booking.id}
                       draggable={!readOnly}
                       className={`absolute rounded-lg border-2 ${colors.bg} ${colors.border} ${statusClass} ${readOnly ? 'cursor-default' : 'cursor-grab'} transition-all hover:shadow-lg hover:z-10 ${
-                        isDragging ? 'opacity-50 cursor-grabbing' : ''
-                      }`}
+                        isDragging || isSiblingDragging ? 'opacity-50 cursor-grabbing' : ''
+                      } ${isSiblingHighlighted ? 'ring-2 ring-indigo-500 ring-offset-1 z-20' : ''} ${isGrouped ? 'border-l-4 border-l-indigo-500' : ''}`}
                       style={{
                         left: Math.max(0, left),
                         top: rowTop + (viewMode === 'monthly' ? 2 : 4),
@@ -959,11 +1075,14 @@ export default function TimelineView({
                       onDragStart={(e) => !readOnly && handleDragStart(booking, e)}
                       onDragEnd={handleDragEnd}
                       onMouseEnter={(e) => handleBookingHover(booking, e)}
-                      onMouseLeave={() => setHoveredBooking(null)}
+                      onMouseLeave={handleBookingLeave}
                     >
                       {viewMode === 'monthly' ? (
                         /* Compact monthly view */
                         <div className="h-full px-1 flex items-center gap-1 overflow-hidden">
+                          {isGrouped && (
+                            <span className="w-2 h-2 bg-indigo-500 rounded-sm flex-shrink-0" title="Part of group" />
+                          )}
                           <img src={SOURCE_ICONS[booking.source]} alt={booking.source} className="w-3 h-3 object-contain flex-shrink-0" />
                           <p className={`text-[10px] font-medium truncate ${colors.text}`}>
                             {booking.guestName.split(' ').map(n => n[0]).join('').slice(0, 3)}
@@ -983,9 +1102,16 @@ export default function TimelineView({
                         <div className="h-full px-2 py-1 flex items-center gap-2 overflow-hidden">
                           <img src={SOURCE_ICONS[booking.source]} alt={booking.source} className="w-4 h-4 object-contain flex-shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <p className={`text-xs font-medium truncate ${colors.text}`}>
-                              {booking.guestName}
-                            </p>
+                            <div className="flex items-center gap-1">
+                              <p className={`text-xs font-medium truncate ${colors.text}`}>
+                                {booking.guestName}
+                              </p>
+                              {isGrouped && (
+                                <span className="text-[8px] px-1 py-0.5 font-bold bg-indigo-100 text-indigo-700 rounded flex-shrink-0" title={`Group: ${booking.groupRoomCount || '?'} rooms`}>
+                                  G{booking.groupRoomCount || ''}
+                                </span>
+                              )}
+                            </div>
                             <p className={`text-xs truncate ${colors.text} opacity-70`}>
                               {booking.guestCount} guest{booking.guestCount !== 1 ? 's' : ''}
                             </p>
@@ -1051,6 +1177,18 @@ export default function TimelineView({
             top: Math.min(hoverPosition.y + 10, window.innerHeight - 350),
           }}
         >
+          {/* Group indicator banner */}
+          {(hoveredBooking.isGrouped || hoveredBooking.groupId) && (
+            <div className="mb-3 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span className="text-xs font-medium text-indigo-700">
+                Group Booking ({hoveredBooking.groupRoomCount || hoveredBooking.group?._count?.bookings || '?'} rooms)
+              </span>
+            </div>
+          )}
+
           {/* Header with source and status badges */}
           <div className="flex items-center gap-2 mb-3">
             <img src={SOURCE_ICONS[hoveredBooking.source]} alt={hoveredBooking.source} className="w-4 h-4 object-contain" />
