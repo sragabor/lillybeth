@@ -3,6 +3,7 @@
 import {useState, useEffect, useCallback, Fragment} from 'react'
 import {
   Booking,
+  ListItem,
   AvailableRoom,
   BookingStatus,
   SOURCE_COLORS,
@@ -17,6 +18,8 @@ import {
   PAYMENT_LABELS,
 } from '../types'
 import BookingModal from './BookingModal'
+import BookingGroupModal from './BookingGroupModal'
+import RoomInGroupEditModal from './RoomInGroupEditModal'
 import { LocalizedText } from '@/lib/i18n'
 import { getLocalizedText } from '@/lib/i18n/utils'
 import { useLanguage } from '@/contexts/LanguageContext'
@@ -82,7 +85,7 @@ export default function BookingListView({
   const { language } = useLanguage()
   // State
   const [activeTab, setActiveTab] = useState<Tab>('upcoming')
-  const [bookings, setBookings] = useState<Booking[]>([])
+  const [listItems, setListItems] = useState<ListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -96,14 +99,25 @@ export default function BookingListView({
   const [sortBy, setSortBy] = useState<SortField>('checkIn')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
-  // Expanded rows
+  // Expanded rows (for standalone booking details)
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null)
   const [expandedDetails, setExpandedDetails] = useState<ExpandedBookingDetails | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
 
+  // Expanded groups (to show room list within a group)
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
+
   // Modal state
   const [showModal, setShowModal] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+
+  // Group modal state (for editing groups)
+  const [showGroupModal, setShowGroupModal] = useState(false)
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+
+  // Room-in-group editing state
+  const [showRoomEditModal, setShowRoomEditModal] = useState(false)
+  const [editingRoomInGroupId, setEditingRoomInGroupId] = useState<{ groupId: string; bookingId: string } | null>(null)
 
   // Inline status update state
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
@@ -144,7 +158,7 @@ export default function BookingListView({
       const res = await fetch(`/api/admin/bookings/list?${params}`)
       if (res.ok) {
         const data = await res.json()
-        setBookings(data.bookings)
+        setListItems(data.bookings)
         setPagination(data.pagination)
       }
     } catch (error) {
@@ -179,14 +193,26 @@ export default function BookingListView({
     }
   }
 
-  // Toggle expanded row
+  // Toggle expanded row for standalone bookings
   const toggleExpanded = (bookingId: string) => {
     if (expandedBookingId === bookingId) {
       setExpandedBookingId(null)
       setExpandedDetails(null)
     } else {
       setExpandedBookingId(bookingId)
+      setExpandedGroupId(null) // Close any expanded group
       fetchBookingDetails(bookingId)
+    }
+  }
+
+  // Toggle expanded group (to show rooms list)
+  const toggleGroupExpanded = (groupId: string) => {
+    if (expandedGroupId === groupId) {
+      setExpandedGroupId(null)
+    } else {
+      setExpandedGroupId(groupId)
+      setExpandedBookingId(null) // Close any expanded booking details
+      setExpandedDetails(null)
     }
   }
 
@@ -206,13 +232,25 @@ export default function BookingListView({
     return <span className="text-amber-600 ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
   }
 
-  // Handle edit
+  // Handle edit standalone booking
   const handleEdit = (booking: Booking) => {
     setEditingBooking(booking)
     setShowModal(true)
   }
 
-  // Handle inline status update
+  // Handle edit group
+  const handleEditGroup = (groupId: string) => {
+    setEditingGroupId(groupId)
+    setShowGroupModal(true)
+  }
+
+  // Handle edit room within a group
+  const handleEditRoomInGroup = (groupId: string, bookingId: string) => {
+    setEditingRoomInGroupId({ groupId, bookingId })
+    setShowRoomEditModal(true)
+  }
+
+  // Handle inline status update for standalone bookings
   const handleStatusUpdate = async (bookingId: string, newStatus: BookingStatus) => {
     setUpdatingStatusId(bookingId)
     try {
@@ -233,6 +271,29 @@ export default function BookingListView({
       }
     } catch (error) {
       console.error('Error updating status:', error)
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
+  // Handle inline status update for groups
+  const handleGroupStatusUpdate = async (groupId: string, newStatus: BookingStatus) => {
+    setUpdatingStatusId(groupId)
+    try {
+      const res = await fetch(`/api/admin/booking-groups/${groupId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (res.ok) {
+        fetchBookings()
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to update status')
+      }
+    } catch (error) {
+      console.error('Error updating group status:', error)
     } finally {
       setUpdatingStatusId(null)
     }
@@ -433,89 +494,118 @@ export default function BookingListView({
                     </div>
                   </td>
                 </tr>
-              ) : bookings.length === 0 ? (
+              ) : listItems.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="px-4 py-8 text-center text-stone-500">
                     No bookings found
                   </td>
                 </tr>
               ) : (
-                bookings.map((booking) => {
-                  const isExpanded = expandedBookingId === booking.id
-                  const isCancelled = booking.status === 'CANCELLED'
-                  const sourceColors = SOURCE_COLORS[booking.source]
-                  const statusColors = STATUS_COLORS[booking.status]
-                  const paymentColors = PAYMENT_COLORS[booking.paymentStatus]
+                listItems.map((item) => {
+                  const isGroup = item.type === 'group'
+                  const isExpanded = isGroup ? expandedGroupId === item.id : expandedBookingId === item.id
+                  const isCancelled = item.status === 'CANCELLED'
+                  const statusColors = STATUS_COLORS[item.status]
+                  const paymentColors = PAYMENT_COLORS[item.paymentStatus]
 
                   return (
-                    <Fragment key={booking.id}>
+                    <Fragment key={item.id}>
                       {/* Main Row */}
                       <tr
-                        key={booking.id}
                         className={`hover:bg-stone-50 transition-colors ${
                           isCancelled ? 'bg-red-50/50' : ''
-                        } ${isExpanded ? 'bg-amber-50/30' : ''}`}
+                        } ${isExpanded ? 'bg-amber-50/30' : ''} ${isGroup ? 'bg-indigo-50/30' : ''}`}
                       >
                         <td className="px-4 py-3">
-                          <span className="font-mono text-sm text-stone-600">
-                            #{getShortId(booking.id)}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm text-stone-600">
+                              #{getShortId(item.id)}
+                            </span>
+                            {isGroup && (
+                              <span className="px-1.5 py-0.5 text-xs font-bold bg-indigo-100 text-indigo-700 rounded">
+                                {item.roomCount}R
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <img src={SOURCE_ICONS[booking.source]} alt={booking.source} className="w-4 h-4 object-contain" />
+                              <img src={SOURCE_ICONS[item.source]} alt={item.source} className="w-4 h-4 object-contain" />
                               <span className={`font-medium text-stone-900 ${isCancelled ? 'line-through' : ''}`}>
-                                {booking.guestName}
+                                {item.guestName}
                               </span>
+                              {isGroup && (
+                                <span className="px-1.5 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full">
+                                  Group
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-1 mt-1 flex-wrap">
-                              <span className="text-xs px-1.5 py-0.5 bg-stone-200 text-stone-700 rounded">
-                                {booking.room.roomType?.building.name}
-                              </span>
-                              <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">
-                                {booking.room.roomType?.name && getLocalizedText(booking.room.roomType.name, language)}
-                              </span>
-                              <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                {booking.room.name}
-                              </span>
+                              {isGroup && item.bookings ? (
+                                // For groups, show summary of rooms
+                                item.bookings.slice(0, 2).map((b, idx) => (
+                                  <span key={b.id} className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                    {b.room.name}
+                                    {idx < Math.min(item.bookings!.length - 1, 1) && ','}
+                                  </span>
+                                ))
+                              ) : item.room ? (
+                                // For standalone, show full room path
+                                <>
+                                  <span className="text-xs px-1.5 py-0.5 bg-stone-200 text-stone-700 rounded">
+                                    {item.room.roomType?.building.name}
+                                  </span>
+                                  <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">
+                                    {item.room.roomType?.name && getLocalizedText(item.room.roomType.name, language)}
+                                  </span>
+                                  <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                    {item.room.name}
+                                  </span>
+                                </>
+                              ) : null}
+                              {isGroup && item.bookings && item.bookings.length > 2 && (
+                                <span className="text-xs text-stone-500">
+                                  +{item.bookings.length - 2} more
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-stone-600">
-                          {booking.guestPhone || '-'}
+                          {item.guestPhone || '-'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm">
                             <div>
-                              <span className="text-stone-900">{formatDate(booking.checkIn)}</span>
+                              <span className="text-stone-900">{formatDate(item.checkIn)}</span>
                               <span className="text-stone-400 mx-1">→</span>
-                              <span className="text-stone-900">{formatDate(booking.checkOut)}</span>
+                              <span className="text-stone-900">{formatDate(item.checkOut)}</span>
                             </div>
-                            {booking.arrivalTime && (
+                            {item.arrivalTime && (
                               <div className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {booking.arrivalTime}
+                                {item.arrivalTime}
                               </div>
                             )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-stone-600">
-                          {booking.nights || '-'}
+                          {item.nights || '-'}
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-stone-600">
-                          {booking.guestCount}
+                          {item.guestCount}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex flex-col items-end">
                             <span className="font-medium text-stone-900">
-                              {booking.totalAmount ? `${booking.totalAmount.toFixed(2)} €` : '-'}
+                              {item.totalAmount ? `${item.totalAmount.toFixed(2)} €` : '-'}
                             </span>
-                            {booking.hasCustomHufPrice && booking.customHufPrice && (
+                            {item.hasCustomHufPrice && item.customHufPrice && (
                               <span className="text-xs text-purple-700 font-medium mt-0.5">
-                                {booking.customHufPrice.toLocaleString()} Ft
+                                {item.customHufPrice.toLocaleString()} Ft
                               </span>
                             )}
                           </div>
@@ -524,20 +614,20 @@ export default function BookingListView({
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusColors.bg} ${statusColors.text}`}
                           >
-                            <span>{STATUS_ICONS[booking.status]}</span>
-                            {STATUS_LABELS[booking.status]}
+                            <span>{STATUS_ICONS[item.status]}</span>
+                            {STATUS_LABELS[item.status]}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
                             className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}
                           >
-                            {PAYMENT_LABELS[booking.paymentStatus]}
+                            {PAYMENT_LABELS[item.paymentStatus]}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            {booking.hasCustomHufPrice && booking.customHufPrice && (
+                            {item.hasCustomHufPrice && item.customHufPrice && (
                               <span
                                 title="Custom HUF price agreed"
                                 className="px-1.5 py-0.5 text-xs font-bold bg-purple-100 text-purple-700 rounded"
@@ -545,7 +635,7 @@ export default function BookingListView({
                                 HUF
                               </span>
                             )}
-                            {booking.notes && (
+                            {item.notes && (
                               <span title="Has notes">
                                 <svg
                                   className="w-4 h-4 text-stone-400"
@@ -562,7 +652,7 @@ export default function BookingListView({
                                 </svg>
                               </span>
                             )}
-                            {booking.additionalPrices.length > 0 && (
+                            {!isGroup && item.additionalPrices && item.additionalPrices.length > 0 && (
                               <span title="Has additional prices">
                                 <svg
                                   className="w-4 h-4 text-amber-500"
@@ -583,7 +673,7 @@ export default function BookingListView({
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
-                            onClick={() => toggleExpanded(booking.id)}
+                            onClick={() => isGroup ? toggleGroupExpanded(item.id) : toggleExpanded(item.id)}
                             className={`p-1 rounded hover:bg-stone-200 transition-colors cursor-pointer ${
                               isExpanded ? 'bg-stone-200' : ''
                             }`}
@@ -607,133 +697,32 @@ export default function BookingListView({
                         </td>
                       </tr>
 
-                      <>
-                      {/* Expanded Row */}
+                      {/* Expanded Row - Different content for groups vs standalone */}
                       {isExpanded && (
-                        <tr key={`${booking.id}-expanded`}>
-                          <td colSpan={11} className="px-4 py-4 bg-stone-50">
-                            {loadingDetails ? (
-                              <div className="flex items-center justify-center py-4">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-stone-800" />
-                              </div>
-                            ) : expandedDetails ? (
-                              <div className="grid grid-cols-3 gap-6">
-                                {/* Guest Details */}
-                                <div>
-                                  <h4 className="font-medium text-stone-900 mb-2">Guest Details</h4>
-                                  <div className="space-y-1 text-sm">
-                                    <p>
-                                      <span className="text-stone-500">Name:</span>{' '}
-                                      <span className="text-stone-900">{booking.guestName}</span>
+                        <tr key={`${item.id}-expanded`}>
+                          <td colSpan={11} className={`px-4 py-4 ${isGroup ? 'bg-indigo-50/50' : 'bg-stone-50'}`}>
+                            {isGroup ? (
+                              /* Group Expanded View - Shows rooms list */
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-medium text-stone-900">
+                                      Group Booking - {item.roomCount} Rooms
+                                    </h4>
+                                    <p className="text-sm text-stone-600">
+                                      {item.guestEmail && <span>{item.guestEmail} • </span>}
+                                      {item.guestPhone && <span>{item.guestPhone}</span>}
                                     </p>
-                                    <p>
-                                      <span className="text-stone-500">Email:</span>{' '}
-                                      <span className="text-stone-900">{booking.guestEmail || '-'}</span>
-                                    </p>
-                                    <p>
-                                      <span className="text-stone-500">Phone:</span>{' '}
-                                      <span className="text-stone-900">{booking.guestPhone || '-'}</span>
-                                    </p>
-                                    <p>
-                                      <span className="text-stone-500">Guests:</span>{' '}
-                                      <span className="text-stone-900">{booking.guestCount}</span>
-                                    </p>
-                                    <p>
-                                      <span className="text-stone-500">Source:</span>{' '}
-                                      <span className={`${sourceColors.text}`}>
-                                        {SOURCE_LABELS[booking.source]}
-                                      </span>
-                                    </p>
-                                    {booking.notes && (
-                                      <div className="mt-2 p-2 bg-white rounded border border-stone-200">
-                                        <p className="text-xs text-stone-500 mb-1">Notes:</p>
-                                        <p className="text-stone-700">{booking.notes}</p>
-                                      </div>
-                                    )}
                                   </div>
-                                </div>
-
-                                {/* Price Breakdown */}
-                                <div>
-                                  <h4 className="font-medium text-stone-900 mb-2">Price Breakdown</h4>
-                                  <div className="space-y-2 text-sm">
-                                    {/* Nightly breakdown (collapsed by default) */}
-                                    <div className="flex justify-between">
-                                      <span className="text-stone-600">
-                                        Accommodation ({expandedDetails.priceBreakdown.nights} nights)
-                                      </span>
-                                      <span className="text-stone-900">
-                                        {expandedDetails.priceBreakdown.accommodationTotal.toFixed(2)} €
-                                      </span>
-                                    </div>
-
-                                    {/* Mandatory Prices */}
-                                    {expandedDetails.priceBreakdown.mandatoryPrices.length > 0 && (
-                                      <div className="border-t border-stone-200 pt-2">
-                                        <p className="text-xs text-stone-500 mb-1">Mandatory</p>
-                                        {expandedDetails.priceBreakdown.mandatoryPrices.map((p) => (
-                                          <div key={p.id} className="flex justify-between">
-                                            <span className="text-stone-600">
-                                              {p.title} {p.quantity > 1 && `x${p.quantity}`}
-                                            </span>
-                                            <span className="text-stone-900">{p.total.toFixed(2)} €</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {/* Optional Prices */}
-                                    {expandedDetails.priceBreakdown.optionalPrices.length > 0 && (
-                                      <div className="border-t border-stone-200 pt-2">
-                                        <p className="text-xs text-stone-500 mb-1">Optional</p>
-                                        {expandedDetails.priceBreakdown.optionalPrices.map((p) => (
-                                          <div key={p.id} className="flex justify-between">
-                                            <span className="text-stone-600">
-                                              {p.title} {p.quantity > 1 && `x${p.quantity}`}
-                                            </span>
-                                            <span className="text-stone-900">{p.total.toFixed(2)} €</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {/* Total */}
-                                    <div className="border-t border-stone-300 pt-2">
-                                      <div className="flex justify-between font-medium">
-                                        <span className="text-stone-900">Total (EUR)</span>
-                                        <span className="text-stone-900">
-                                          {expandedDetails.priceBreakdown.grandTotal.toFixed(2)} €
-                                        </span>
-                                      </div>
-                                      {booking.hasCustomHufPrice && booking.customHufPrice && (
-                                        <div className="flex justify-between font-medium mt-1 pt-1 border-t border-purple-200">
-                                          <span className="text-purple-700">Custom HUF Price</span>
-                                          <span className="text-purple-700">
-                                            {booking.customHufPrice.toLocaleString()} Ft
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Status & Payment Controls */}
-                                <div className="flex flex-col gap-4">
-                                  {/* Status Control */}
-                                  <div className="bg-white rounded-lg border border-stone-200 p-3">
-                                    <h4 className="font-medium text-stone-900 mb-2 text-sm">Status</h4>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
-                                        {STATUS_LABELS[booking.status]}
-                                      </span>
-                                    </div>
-                                    {!isCancelled && getNextStatus(booking.status) && (
+                                  <div className="flex items-center gap-3">
+                                    {/* Status advance button for group */}
+                                    {!isCancelled && getNextStatus(item.status) && (
                                       <button
-                                        onClick={() => handleStatusUpdate(booking.id, getNextStatus(booking.status)!)}
-                                        disabled={updatingStatusId === booking.id}
-                                        className="w-full px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                                        onClick={() => handleGroupStatusUpdate(item.id, getNextStatus(item.status)!)}
+                                        disabled={updatingStatusId === item.id}
+                                        className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1"
                                       >
-                                        {updatingStatusId === booking.id ? (
+                                        {updatingStatusId === item.id ? (
                                           <>
                                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
                                             Updating...
@@ -743,60 +732,287 @@ export default function BookingListView({
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                                             </svg>
-                                            {STATUS_ACTION_LABELS[booking.status]}
+                                            {STATUS_ACTION_LABELS[item.status]}
                                           </>
                                         )}
                                       </button>
                                     )}
-                                    {booking.status === 'CHECKED_OUT' && (
-                                      <p className="text-xs text-emerald-600 text-center">Booking completed</p>
-                                    )}
+                                    <button
+                                      onClick={() => handleEditGroup(item.id)}
+                                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer text-sm"
+                                    >
+                                      Edit Group
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Rooms table within group */}
+                                <div className="bg-white rounded-lg border border-stone-200 overflow-hidden">
+                                  <table className="w-full text-sm">
+                                    <thead className="bg-stone-50">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-stone-500 uppercase">Room</th>
+                                        <th className="px-3 py-2 text-center text-xs font-medium text-stone-500 uppercase">Guests</th>
+                                        <th className="px-3 py-2 text-right text-xs font-medium text-stone-500 uppercase">Amount</th>
+                                        <th className="px-3 py-2 text-center text-xs font-medium text-stone-500 uppercase">Extras</th>
+                                        <th className="px-3 py-2 text-center text-xs font-medium text-stone-500 uppercase w-16">Edit</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-stone-100">
+                                      {item.bookings?.map((roomBooking) => (
+                                        <tr key={roomBooking.id} className="hover:bg-stone-50">
+                                          <td className="px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xs px-1.5 py-0.5 bg-stone-200 text-stone-700 rounded">
+                                                {roomBooking.room.roomType?.building.name}
+                                              </span>
+                                              <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">
+                                                {roomBooking.room.roomType?.name && getLocalizedText(roomBooking.room.roomType.name, language)}
+                                              </span>
+                                              <span className="font-medium text-stone-900">{roomBooking.room.name}</span>
+                                            </div>
+                                          </td>
+                                          <td className="px-3 py-2 text-center text-stone-600">
+                                            {roomBooking.guestCount}
+                                          </td>
+                                          <td className="px-3 py-2 text-right text-stone-900">
+                                            {roomBooking.totalAmount ? `${roomBooking.totalAmount.toFixed(2)} €` : '-'}
+                                          </td>
+                                          <td className="px-3 py-2 text-center">
+                                            {roomBooking.additionalPrices.length > 0 ? (
+                                              <span className="text-xs text-amber-600">
+                                                {roomBooking.additionalPrices.length} item(s)
+                                              </span>
+                                            ) : (
+                                              <span className="text-stone-400">-</span>
+                                            )}
+                                          </td>
+                                          <td className="px-3 py-2 text-center">
+                                            <button
+                                              onClick={() => handleEditRoomInGroup(item.id, roomBooking.id)}
+                                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
+                                              title="Edit room booking"
+                                            >
+                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                              </svg>
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    <tfoot className="bg-stone-50">
+                                      <tr>
+                                        <td colSpan={2} className="px-3 py-2 text-right font-medium text-stone-700">
+                                          Group Total:
+                                        </td>
+                                        <td className="px-3 py-2 text-right font-medium text-stone-900">
+                                          {item.totalAmount ? `${item.totalAmount.toFixed(2)} €` : '-'}
+                                        </td>
+                                        <td colSpan={2}></td>
+                                      </tr>
+                                      {item.hasCustomHufPrice && item.customHufPrice && (
+                                        <tr>
+                                          <td colSpan={2} className="px-3 py-2 text-right font-medium text-purple-700">
+                                            Custom HUF Price:
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-medium text-purple-700">
+                                            {item.customHufPrice.toLocaleString()} Ft
+                                          </td>
+                                          <td colSpan={2}></td>
+                                        </tr>
+                                      )}
+                                    </tfoot>
+                                  </table>
+                                </div>
+
+                                {item.notes && (
+                                  <div className="p-3 bg-white rounded-lg border border-stone-200">
+                                    <p className="text-xs text-stone-500 mb-1">Notes:</p>
+                                    <p className="text-sm text-stone-700">{item.notes}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* Standalone Booking Expanded View */
+                              loadingDetails ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-stone-800" />
+                                </div>
+                              ) : expandedDetails ? (
+                                <div className="grid grid-cols-3 gap-6">
+                                  {/* Guest Details */}
+                                  <div>
+                                    <h4 className="font-medium text-stone-900 mb-2">Guest Details</h4>
+                                    <div className="space-y-1 text-sm">
+                                      <p>
+                                        <span className="text-stone-500">Name:</span>{' '}
+                                        <span className="text-stone-900">{item.guestName}</span>
+                                      </p>
+                                      <p>
+                                        <span className="text-stone-500">Email:</span>{' '}
+                                        <span className="text-stone-900">{item.guestEmail || '-'}</span>
+                                      </p>
+                                      <p>
+                                        <span className="text-stone-500">Phone:</span>{' '}
+                                        <span className="text-stone-900">{item.guestPhone || '-'}</span>
+                                      </p>
+                                      <p>
+                                        <span className="text-stone-500">Guests:</span>{' '}
+                                        <span className="text-stone-900">{item.guestCount}</span>
+                                      </p>
+                                      <p>
+                                        <span className="text-stone-500">Source:</span>{' '}
+                                        <span className={`${SOURCE_COLORS[item.source].text}`}>
+                                          {SOURCE_LABELS[item.source]}
+                                        </span>
+                                      </p>
+                                      {item.notes && (
+                                        <div className="mt-2 p-2 bg-white rounded border border-stone-200">
+                                          <p className="text-xs text-stone-500 mb-1">Notes:</p>
+                                          <p className="text-stone-700">{item.notes}</p>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
 
-                                  {/* Payment Info */}
-                                  <div className="bg-white rounded-lg border border-stone-200 p-3">
-                                    <h4 className="font-medium text-stone-900 mb-2 text-sm">Payment</h4>
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}>
-                                        {PAYMENT_LABELS[booking.paymentStatus]}
-                                      </span>
-                                      <div className="text-right">
-                                        <span className="text-sm font-medium text-stone-900">
-                                          {booking.totalAmount?.toFixed(2) || '0.00'} €
+                                  {/* Price Breakdown */}
+                                  <div>
+                                    <h4 className="font-medium text-stone-900 mb-2">Price Breakdown</h4>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between">
+                                        <span className="text-stone-600">
+                                          Accommodation ({expandedDetails.priceBreakdown.nights} nights)
                                         </span>
-                                        {booking.hasCustomHufPrice && booking.customHufPrice && (
-                                          <div className="text-xs font-medium text-purple-700">
-                                            {booking.customHufPrice.toLocaleString()} Ft
+                                        <span className="text-stone-900">
+                                          {expandedDetails.priceBreakdown.accommodationTotal.toFixed(2)} €
+                                        </span>
+                                      </div>
+
+                                      {expandedDetails.priceBreakdown.mandatoryPrices.length > 0 && (
+                                        <div className="border-t border-stone-200 pt-2">
+                                          <p className="text-xs text-stone-500 mb-1">Mandatory</p>
+                                          {expandedDetails.priceBreakdown.mandatoryPrices.map((p) => (
+                                            <div key={p.id} className="flex justify-between">
+                                              <span className="text-stone-600">
+                                                {p.title} {p.quantity > 1 && `x${p.quantity}`}
+                                              </span>
+                                              <span className="text-stone-900">{p.total.toFixed(2)} €</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {expandedDetails.priceBreakdown.optionalPrices.length > 0 && (
+                                        <div className="border-t border-stone-200 pt-2">
+                                          <p className="text-xs text-stone-500 mb-1">Optional</p>
+                                          {expandedDetails.priceBreakdown.optionalPrices.map((p) => (
+                                            <div key={p.id} className="flex justify-between">
+                                              <span className="text-stone-600">
+                                                {p.title} {p.quantity > 1 && `x${p.quantity}`}
+                                              </span>
+                                              <span className="text-stone-900">{p.total.toFixed(2)} €</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      <div className="border-t border-stone-300 pt-2">
+                                        <div className="flex justify-between font-medium">
+                                          <span className="text-stone-900">Total (EUR)</span>
+                                          <span className="text-stone-900">
+                                            {expandedDetails.priceBreakdown.grandTotal.toFixed(2)} €
+                                          </span>
+                                        </div>
+                                        {item.hasCustomHufPrice && item.customHufPrice && (
+                                          <div className="flex justify-between font-medium mt-1 pt-1 border-t border-purple-200">
+                                            <span className="text-purple-700">Custom HUF Price</span>
+                                            <span className="text-purple-700">
+                                              {item.customHufPrice.toLocaleString()} Ft
+                                            </span>
                                           </div>
                                         )}
                                       </div>
                                     </div>
-                                    {booking.hasCustomHufPrice && booking.customHufPrice && (
-                                      <div className="mt-2 px-2 py-1.5 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700">
-                                        <span className="font-medium">Custom HUF price</span> – manually agreed amount
-                                      </div>
-                                    )}
-                                    <p className="text-xs text-stone-500 mt-1">
-                                      Click Edit to manage payments
-                                    </p>
                                   </div>
 
-                                  {/* Edit Button */}
-                                  <button
-                                    onClick={() => handleEdit(booking)}
-                                    className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer text-sm"
-                                  >
-                                    {isCancelled ? 'View Details' : 'Edit Booking'}
-                                  </button>
+                                  {/* Status & Payment Controls */}
+                                  <div className="flex flex-col gap-4">
+                                    <div className="bg-white rounded-lg border border-stone-200 p-3">
+                                      <h4 className="font-medium text-stone-900 mb-2 text-sm">Status</h4>
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
+                                          {STATUS_LABELS[item.status]}
+                                        </span>
+                                      </div>
+                                      {!isCancelled && getNextStatus(item.status) && (
+                                        <button
+                                          onClick={() => handleStatusUpdate(item.id, getNextStatus(item.status)!)}
+                                          disabled={updatingStatusId === item.id}
+                                          className="w-full px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                                        >
+                                          {updatingStatusId === item.id ? (
+                                            <>
+                                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                                              Updating...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                                              </svg>
+                                              {STATUS_ACTION_LABELS[item.status]}
+                                            </>
+                                          )}
+                                        </button>
+                                      )}
+                                      {item.status === 'CHECKED_OUT' && (
+                                        <p className="text-xs text-emerald-600 text-center">Booking completed</p>
+                                      )}
+                                    </div>
+
+                                    <div className="bg-white rounded-lg border border-stone-200 p-3">
+                                      <h4 className="font-medium text-stone-900 mb-2 text-sm">Payment</h4>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}>
+                                          {PAYMENT_LABELS[item.paymentStatus]}
+                                        </span>
+                                        <div className="text-right">
+                                          <span className="text-sm font-medium text-stone-900">
+                                            {item.totalAmount?.toFixed(2) || '0.00'} €
+                                          </span>
+                                          {item.hasCustomHufPrice && item.customHufPrice && (
+                                            <div className="text-xs font-medium text-purple-700">
+                                              {item.customHufPrice.toLocaleString()} Ft
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {item.hasCustomHufPrice && item.customHufPrice && (
+                                        <div className="mt-2 px-2 py-1.5 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700">
+                                          <span className="font-medium">Custom HUF price</span> – manually agreed amount
+                                        </div>
+                                      )}
+                                      <p className="text-xs text-stone-500 mt-1">
+                                        Click Edit to manage payments
+                                      </p>
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleEdit(expandedDetails.booking)}
+                                      className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer text-sm"
+                                    >
+                                      {isCancelled ? 'View Details' : 'Edit Booking'}
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <p className="text-center text-stone-500">Failed to load details</p>
+                              ) : (
+                                <p className="text-center text-stone-500">Failed to load details</p>
+                              )
                             )}
                           </td>
                         </tr>
                       )}
-                      </>
                     </Fragment>
                   )
                 })
@@ -835,7 +1051,7 @@ export default function BookingListView({
         </div>
       )}
 
-      {/* Booking Modal */}
+      {/* Booking Modal (for standalone bookings) */}
       <BookingModal
         isOpen={showModal}
         onClose={() => {
@@ -850,6 +1066,33 @@ export default function BookingListView({
         }}
         editingBooking={editingBooking}
         availableRooms={availableRooms}
+      />
+
+      {/* Group Modal */}
+      <BookingGroupModal
+        isOpen={showGroupModal}
+        onClose={() => {
+          setShowGroupModal(false)
+          setEditingGroupId(null)
+        }}
+        onSave={() => {
+          fetchBookings()
+        }}
+        groupId={editingGroupId}
+      />
+
+      {/* Room In Group Edit Modal */}
+      <RoomInGroupEditModal
+        isOpen={showRoomEditModal}
+        onClose={() => {
+          setShowRoomEditModal(false)
+          setEditingRoomInGroupId(null)
+        }}
+        onSave={() => {
+          fetchBookings()
+        }}
+        groupId={editingRoomInGroupId?.groupId || null}
+        bookingId={editingRoomInGroupId?.bookingId || null}
       />
     </div>
   )

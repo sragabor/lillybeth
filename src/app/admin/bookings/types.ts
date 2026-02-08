@@ -78,6 +78,48 @@ export interface Booking {
   invoiceSent: boolean
   vendegem: boolean
   cleaned: boolean
+  // Group relation (for grouped bookings)
+  groupId?: string | null
+}
+
+// Room booking within a group
+export interface GroupRoomBooking {
+  id: string
+  roomId: string
+  guestCount: number
+  totalAmount: number | null
+  room: Room
+  additionalPrices: BookingAdditionalPrice[]
+}
+
+// Unified list item - can be either standalone booking or a group
+export interface ListItem {
+  type: 'standalone' | 'group'
+  id: string
+  guestName: string
+  guestEmail: string | null
+  guestPhone: string | null
+  guestCount: number
+  checkIn: string
+  checkOut: string
+  arrivalTime: string | null
+  source: BookingSource
+  status: BookingStatus
+  paymentStatus: PaymentStatus
+  notes: string | null
+  totalAmount: number | null
+  hasCustomHufPrice: boolean
+  customHufPrice: number | null
+  invoiceSent: boolean
+  vendegem: boolean
+  cleaned: boolean
+  nights: number
+  roomCount: number
+  // For standalone bookings
+  room?: Room
+  additionalPrices?: BookingAdditionalPrice[]
+  // For groups - nested room bookings
+  bookings?: GroupRoomBooking[]
 }
 
 export interface AvailableRoom {

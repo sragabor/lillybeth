@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Fetch bookings that overlap with the date range
+    // Include group information for visual linking
     const bookings = await prisma.booking.findMany({
       where: {
         roomId: { in: roomIds },
@@ -98,8 +99,46 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        // Include group info for visual linking in calendar
+        group: {
+          select: {
+            id: true,
+            guestName: true,
+            totalAmount: true,
+            hasCustomHufPrice: true,
+            customHufPrice: true,
+            _count: {
+              select: { bookings: true },
+            },
+          },
+        },
       },
       orderBy: { checkIn: 'asc' },
+    })
+
+    // For grouped bookings, determine which is the "primary" (first by room order)
+    // and add metadata for UI rendering
+    const groupedBookingIds = new Set<string>()
+    const bookingsWithGroupInfo = bookings.map((booking) => {
+      if (booking.groupId) {
+        groupedBookingIds.add(booking.groupId)
+      }
+      return {
+        ...booking,
+        isGrouped: !!booking.groupId,
+        groupRoomCount: booking.group?._count?.bookings || 1,
+      }
+    })
+
+    // Find all sibling booking IDs for each group (for UI linking)
+    const groupSiblings: Record<string, string[]> = {}
+    bookingsWithGroupInfo.forEach((booking) => {
+      if (booking.groupId) {
+        if (!groupSiblings[booking.groupId]) {
+          groupSiblings[booking.groupId] = []
+        }
+        groupSiblings[booking.groupId].push(booking.id)
+      }
     })
 
     // Enhancement data: Fetch inactive days (fail-safe - should not break core data)
@@ -192,9 +231,9 @@ export async function GET(request: NextRequest) {
       specialDays = {}
     }
 
-    // Group bookings by room ID for easy lookup
-    const bookingsByRoom: Record<string, typeof bookings> = {}
-    bookings.forEach((booking) => {
+    // Group bookings by room ID for easy lookup (using enhanced booking data)
+    const bookingsByRoom: Record<string, typeof bookingsWithGroupInfo> = {}
+    bookingsWithGroupInfo.forEach((booking) => {
       if (!bookingsByRoom[booking.roomId]) {
         bookingsByRoom[booking.roomId] = []
       }
@@ -203,11 +242,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       buildings,
-      bookings,
+      bookings: bookingsWithGroupInfo,
       bookingsByRoom,
       roomToRoomType,
       inactiveDaysByRoomType,
       specialDays,
+      groupSiblings,
       dateRange: { start: startDate, end: endDate },
     })
   } catch (error) {

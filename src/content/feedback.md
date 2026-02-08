@@ -1,26 +1,25 @@
-## 6. Visual indication of custom HUF final price
+## Feedback – Calendar Drag & Drop UX Improvement
 
-If a booking has a **custom agreed final price in HUF**:
+### Issue: No Visual Feedback During Drag & Drop Update
 
-- This must be **clearly and consistently indicated** in all booking-related views
+- In **Calendar view**, when a booking (or group booking) is modified via **drag & drop**:
+  - The update takes a noticeable amount of time
+  - During this time, there is **no visual feedback**
+  - It feels like the system is frozen or unresponsive
 
-Required locations:
-- Booking list (table view)
-- Booking expanded row / details view
-- Edit booking modal
-- Calendar hover / tooltip (if final price is shown there)
+### Expected Behavior
 
-Visual requirements:
-- The EUR final price remains the primary price
-- The HUF price appears as a **secondary value**
-- Clearly label it as:
-  - “Custom agreement (HUF)”
-- Use a visual indicator such as:
-  - badge
-  - icon
-  - subtle highlight
-- It must be immediately obvious that:
-  - this is **not a converted value**
-  - this is an **explicit custom agreement**
+- While the system is processing the drag & drop update:
+  - A **loader / loading indicator** should be displayed
+- The user should clearly see that:
+  - The system is working
+  - The update is in progress
 
-The same booking must never appear ambiguous regarding which price is official and which is custom.
+### UX Notes
+
+- Loader can be:
+  - Global calendar overlay
+  - Or row-level / booking-level loader
+- Drag & drop interaction should:
+  - Be temporarily disabled during processing
+  - Prevent further interactions until the update finishes
