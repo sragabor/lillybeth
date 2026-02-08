@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth'
 interface RoomPriceRequest {
   roomId: string
   guestCount: number
+  selectedOptionalPriceIds?: string[]
 }
 
 interface NightlyBreakdown {
@@ -24,6 +25,17 @@ interface AdditionalPrice {
   mandatory: boolean
   perNight: boolean
   perGuest: boolean
+  origin: 'building' | 'roomType'
+}
+
+interface AvailableAdditionalPrice {
+  id: string
+  title: string
+  priceEur: number
+  mandatory: boolean
+  perNight: boolean
+  perGuest: boolean
+  origin: 'building' | 'roomType'
 }
 
 interface RoomPriceBreakdown {
@@ -32,10 +44,14 @@ interface RoomPriceBreakdown {
   buildingName: string
   roomTypeName: string
   nights: number
+  guestCount: number
   nightlyBreakdown: NightlyBreakdown[]
   accommodationTotal: number
   mandatoryPrices: AdditionalPrice[]
   mandatoryTotal: number
+  optionalPrices: AdditionalPrice[]
+  optionalTotal: number
+  availableOptionalPrices: AvailableAdditionalPrice[]
   roomTotal: number
 }
 
@@ -146,19 +162,22 @@ export async function POST(request: NextRequest) {
         current.setDate(current.getDate() + 1)
       }
 
-      // Calculate mandatory additional prices
+      // Calculate additional prices (mandatory and optional)
       const mandatoryPrices: AdditionalPrice[] = []
+      const optionalPrices: AdditionalPrice[] = []
+      const availableOptionalPrices: AvailableAdditionalPrice[] = []
       let mandatoryTotal = 0
+      let optionalTotal = 0
 
-      // Collect all mandatory prices from building and room type
+      // Collect all prices from building and room type
       const allPrices = [
         ...room.roomType.building.additionalPrices.map((p) => ({ ...p, origin: 'building' as const })),
         ...room.roomType.additionalPrices.map((p) => ({ ...p, origin: 'roomType' as const })),
       ]
 
-      for (const price of allPrices) {
-        if (!price.mandatory) continue
+      const selectedOptionalIds = roomReq.selectedOptionalPriceIds || []
 
+      for (const price of allPrices) {
         // Get title as string
         const title = typeof price.title === 'object' && price.title !== null
           ? (price.title as Record<string, string>).en || (price.title as Record<string, string>).hu || ''
@@ -171,21 +190,50 @@ export async function POST(request: NextRequest) {
 
         const total = price.priceEur * quantity
 
-        mandatoryPrices.push({
-          id: price.id,
-          title,
-          priceEur: price.priceEur,
-          quantity,
-          total,
-          mandatory: true,
-          perNight: price.perNight,
-          perGuest: price.perGuest,
-        })
+        if (price.mandatory) {
+          mandatoryPrices.push({
+            id: price.id,
+            title,
+            priceEur: price.priceEur,
+            quantity,
+            total,
+            mandatory: true,
+            perNight: price.perNight,
+            perGuest: price.perGuest,
+            origin: price.origin,
+          })
+          mandatoryTotal += total
+        } else {
+          // Add to available optional prices
+          availableOptionalPrices.push({
+            id: price.id,
+            title,
+            priceEur: price.priceEur,
+            mandatory: false,
+            perNight: price.perNight,
+            perGuest: price.perGuest,
+            origin: price.origin,
+          })
 
-        mandatoryTotal += total
+          // If selected, add to optionalPrices
+          if (selectedOptionalIds.includes(price.id)) {
+            optionalPrices.push({
+              id: price.id,
+              title,
+              priceEur: price.priceEur,
+              quantity,
+              total,
+              mandatory: false,
+              perNight: price.perNight,
+              perGuest: price.perGuest,
+              origin: price.origin,
+            })
+            optionalTotal += total
+          }
+        }
       }
 
-      const roomTotal = accommodationTotal + mandatoryTotal
+      const roomTotal = accommodationTotal + mandatoryTotal + optionalTotal
 
       // Get room type name as string
       const roomTypeName = typeof room.roomType.name === 'object' && room.roomType.name !== null
@@ -198,10 +246,14 @@ export async function POST(request: NextRequest) {
         buildingName: room.roomType.building.name,
         roomTypeName,
         nights,
+        guestCount: roomReq.guestCount,
         nightlyBreakdown,
         accommodationTotal,
         mandatoryPrices,
         mandatoryTotal,
+        optionalPrices,
+        optionalTotal,
+        availableOptionalPrices,
         roomTotal,
       })
 
@@ -214,6 +266,7 @@ export async function POST(request: NextRequest) {
       rooms: roomBreakdowns,
       groupAccommodationTotal: roomBreakdowns.reduce((sum, r) => sum + r.accommodationTotal, 0),
       groupMandatoryTotal,
+      groupOptionalTotal: roomBreakdowns.reduce((sum, r) => sum + r.optionalTotal, 0),
       groupTotal,
     })
   } catch (error) {

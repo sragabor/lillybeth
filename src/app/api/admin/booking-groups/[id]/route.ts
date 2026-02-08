@@ -66,7 +66,9 @@ export async function GET(
         nights,
       },
       paymentSummary: {
+        calculatedTotalAmount: group.calculatedTotalAmount,
         totalAmount: group.totalAmount,
+        hasCustomFinalAmount: group.hasCustomFinalAmount,
         hasCustomHufPrice: group.hasCustomHufPrice,
         customHufPrice: group.customHufPrice,
         paidEur,
@@ -117,6 +119,10 @@ export async function PUT(
     if (data.notes !== undefined) updateData.notes = data.notes || null
     if (data.status !== undefined) updateData.status = data.status
     if (data.paymentStatus !== undefined) updateData.paymentStatus = data.paymentStatus
+    // Handle calculated total (for reference)
+    if (data.calculatedTotalAmount !== undefined) updateData.calculatedTotalAmount = data.calculatedTotalAmount ? parseFloat(data.calculatedTotalAmount) : null
+    // Handle custom final amount logic
+    if (data.hasCustomFinalAmount !== undefined) updateData.hasCustomFinalAmount = data.hasCustomFinalAmount
     if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount ? parseFloat(data.totalAmount) : null
     if (data.hasCustomHufPrice !== undefined) updateData.hasCustomHufPrice = data.hasCustomHufPrice
     if (data.customHufPrice !== undefined) updateData.customHufPrice = data.customHufPrice ? parseFloat(data.customHufPrice) : null

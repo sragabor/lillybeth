@@ -5,6 +5,7 @@ import {
   Booking,
   BookingFormData,
   BookingStatus,
+  BookingSource,
   AvailableRoom,
   PriceBreakdown,
   Payment,
@@ -17,6 +18,8 @@ import {
   PAYMENT_LABELS,
   PAYMENT_COLORS,
   PAYMENT_METHOD_LABELS,
+  SOURCE_LABELS,
+  SOURCE_ICONS,
   getNextStatus,
 } from '../types'
 
@@ -597,21 +600,24 @@ export default function BookingModal({
               <label className="block text-sm font-medium text-stone-700 mb-1">
                 Source <span className="text-red-500">*</span>
               </label>
-              <select
-                value={bookingForm.source}
-                onChange={(e) =>
-                  setBookingForm({ ...bookingForm, source: e.target.value as BookingFormData['source'] })
-                }
-                required
-                disabled={isCancelled}
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent cursor-pointer disabled:bg-stone-100 disabled:cursor-not-allowed"
-              >
-                <option value="MANUAL">Direct</option>
-                <option value="WEBSITE">Website</option>
-                <option value="BOOKING_COM">Booking.com</option>
-                <option value="SZALLAS_HU">Szállás.hu</option>
-                <option value="AIRBNB">Airbnb</option>
-              </select>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(SOURCE_LABELS) as BookingSource[]).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => !isCancelled && setBookingForm({ ...bookingForm, source: s })}
+                    disabled={isCancelled}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      bookingForm.source === s
+                        ? 'border-amber-500 bg-amber-50 text-amber-700'
+                        : 'border-stone-300 hover:bg-stone-50'
+                    }`}
+                  >
+                    <img src={SOURCE_ICONS[s]} alt={s} className="w-4 h-4 object-contain" />
+                    <span className="text-sm">{SOURCE_LABELS[s]}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Guest Name */}

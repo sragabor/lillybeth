@@ -159,12 +159,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate total amount from rooms
-    let groupTotalAmount = 0
+    let calculatedTotalAmount = 0
     const roomsWithTotals = data.rooms.map((roomData: { roomId: string; guestCount: number; totalAmount?: number; additionalPrices?: { title: string; priceEur: number; quantity: number }[] }) => {
       const roomTotal = roomData.totalAmount || 0
-      groupTotalAmount += roomTotal
+      calculatedTotalAmount += roomTotal
       return roomData
     })
+
+    // Determine if custom final amount is being used
+    const hasCustomFinalAmount = data.hasCustomFinalAmount === true &&
+      data.totalAmount !== undefined &&
+      data.totalAmount !== null &&
+      data.totalAmount !== calculatedTotalAmount
+
+    // Final amount is either custom or calculated
+    const finalTotalAmount = hasCustomFinalAmount ? data.totalAmount : calculatedTotalAmount
 
     // Create the booking group with all room bookings
     const group = await prisma.bookingGroup.create({
@@ -179,7 +188,9 @@ export async function POST(request: NextRequest) {
         notes: data.notes || null,
         status: data.status || 'INCOMING',
         paymentStatus: data.paymentStatus || 'PENDING',
-        totalAmount: data.totalAmount ?? groupTotalAmount,
+        calculatedTotalAmount,
+        totalAmount: finalTotalAmount,
+        hasCustomFinalAmount,
         hasCustomHufPrice: data.hasCustomHufPrice || false,
         customHufPrice: data.customHufPrice || null,
         invoiceSent: data.invoiceSent || false,

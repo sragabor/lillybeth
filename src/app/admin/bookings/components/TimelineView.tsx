@@ -16,6 +16,8 @@ import {
   PAYMENT_COLORS,
 } from '../types'
 import BookingModal from './BookingModal'
+import BookingGroupModal from './BookingGroupModal'
+import RoomInGroupEditModal from './RoomInGroupEditModal'
 import { getLocalizedText } from '@/lib/i18n/utils'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -135,6 +137,12 @@ export default function TimelineView({
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+
+  // Group booking modal states (for editing from calendar)
+  const [showGroupModal, setShowGroupModal] = useState(false)
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [showRoomInGroupModal, setShowRoomInGroupModal] = useState(false)
+  const [editingRoomBookingId, setEditingRoomBookingId] = useState<string | null>(null)
 
   // Hover state
   const [hoveredBooking, setHoveredBooking] = useState<TimelineBooking | null>(null)
@@ -301,12 +309,29 @@ export default function TimelineView({
     setShowBookingModal(true)
   }
 
-  const openEditBooking = (booking: Booking) => {
-    setEditingBooking(booking)
-    setSelectedRoomId(null)
-    setSelectedDate(null)
-    setShowBookingModal(true)
-    setHoveredBooking(null)
+  const openEditBooking = (booking: TimelineBooking) => {
+    // Check if this booking is part of a group
+    if (booking.groupId) {
+      // Open room-level edit modal for this specific room
+      setEditingGroupId(booking.groupId)
+      setEditingRoomBookingId(booking.id)
+      setShowRoomInGroupModal(true)
+      setHoveredBooking(null)
+    } else {
+      // Single booking - open standard booking modal
+      setEditingBooking(booking)
+      setSelectedRoomId(null)
+      setSelectedDate(null)
+      setShowBookingModal(true)
+      setHoveredBooking(null)
+    }
+  }
+
+  // Open full group modal from room edit modal
+  const openFullGroupModal = () => {
+    setShowRoomInGroupModal(false)
+    setEditingRoomBookingId(null)
+    setShowGroupModal(true)
   }
 
   // Handle hover
@@ -1358,6 +1383,40 @@ export default function TimelineView({
         availableRooms={availableRooms}
         initialRoomId={selectedRoomId || undefined}
         initialDate={selectedDate || undefined}
+      />
+
+      {/* Room in Group Edit Modal (for editing single room from calendar) */}
+      <RoomInGroupEditModal
+        isOpen={showRoomInGroupModal}
+        onClose={() => {
+          setShowRoomInGroupModal(false)
+          setEditingRoomBookingId(null)
+          setEditingGroupId(null)
+        }}
+        onSave={() => {
+          fetchTimelineData()
+          setShowRoomInGroupModal(false)
+          setEditingRoomBookingId(null)
+          setEditingGroupId(null)
+        }}
+        groupId={editingGroupId}
+        bookingId={editingRoomBookingId}
+        onOpenFullGroup={openFullGroupModal}
+      />
+
+      {/* Full Group Booking Modal */}
+      <BookingGroupModal
+        isOpen={showGroupModal}
+        onClose={() => {
+          setShowGroupModal(false)
+          setEditingGroupId(null)
+        }}
+        onSave={() => {
+          fetchTimelineData()
+          setShowGroupModal(false)
+          setEditingGroupId(null)
+        }}
+        groupId={editingGroupId}
       />
 
       {/* Drag Warning Modal */}

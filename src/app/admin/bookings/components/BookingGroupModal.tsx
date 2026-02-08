@@ -40,12 +40,44 @@ interface GroupRoom {
   additionalPrices: { id: string; title: string; priceEur: number; quantity: number }[]
 }
 
+interface AdditionalPriceInfo {
+  id: string
+  title: string
+  priceEur: number
+  quantity: number
+  total: number
+  mandatory: boolean
+  perNight: boolean
+  perGuest: boolean
+  origin: 'building' | 'roomType'
+}
+
+interface AvailableOptionalPrice {
+  id: string
+  title: string
+  priceEur: number
+  perNight: boolean
+  perGuest: boolean
+  origin: 'building' | 'roomType'
+}
+
 interface RoomPriceBreakdown {
   roomId: string
   roomName: string
+  buildingName: string
+  guestCount: number
   accommodationTotal: number
+  mandatoryPrices: AdditionalPriceInfo[]
   mandatoryTotal: number
+  optionalPrices: AdditionalPriceInfo[]
+  optionalTotal: number
+  availableOptionalPrices: AvailableOptionalPrice[]
   roomTotal: number
+}
+
+interface RoomEditState {
+  guestCount: number
+  selectedOptionalPriceIds: string[]
 }
 
 interface BookingGroup {
@@ -60,7 +92,9 @@ interface BookingGroup {
   notes: string | null
   status: BookingStatus
   paymentStatus: PaymentStatus
+  calculatedTotalAmount: number | null
   totalAmount: number | null
+  hasCustomFinalAmount: boolean
   hasCustomHufPrice: boolean
   customHufPrice: number | null
   invoiceSent: boolean
@@ -99,6 +133,7 @@ export default function BookingGroupModal({
   const [checkOut, setCheckOut] = useState('')
   const [arrivalTime, setArrivalTime] = useState('')
   const [notes, setNotes] = useState('')
+  const [hasCustomFinalAmount, setHasCustomFinalAmount] = useState(false)
   const [totalAmount, setTotalAmount] = useState('')
   const [hasCustomHufPrice, setHasCustomHufPrice] = useState(false)
   const [customHufPrice, setCustomHufPrice] = useState('')
@@ -115,7 +150,9 @@ export default function BookingGroupModal({
   // Payment state
   const [payments, setPayments] = useState<Payment[]>([])
   const [paymentSummary, setPaymentSummary] = useState<{
+    calculatedTotalAmount: number | null
     totalAmount: number | null
+    hasCustomFinalAmount: boolean
     hasCustomHufPrice: boolean
     customHufPrice: number | null
     totalPaid: number
@@ -151,6 +188,11 @@ export default function BookingGroupModal({
   const [calculatedTotal, setCalculatedTotal] = useState<number | null>(null)
   const [calculatingPrice, setCalculatingPrice] = useState(false)
 
+  // Room editing state (inline expandable sections)
+  const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null)
+  const [roomEditStates, setRoomEditStates] = useState<Record<string, RoomEditState>>({})
+  const [hasUnsavedRoomChanges, setHasUnsavedRoomChanges] = useState(false)
+
   // Fetch group data
   const fetchGroup = async () => {
     if (!groupId) return
@@ -170,6 +212,7 @@ export default function BookingGroupModal({
         setCheckOut(g.checkOut ? new Date(g.checkOut).toISOString().split('T')[0] : '')
         setArrivalTime(g.arrivalTime || '')
         setNotes(g.notes || '')
+        setHasCustomFinalAmount(g.hasCustomFinalAmount || false)
         setTotalAmount(g.totalAmount?.toString() || '')
         setHasCustomHufPrice(g.hasCustomHufPrice || false)
         setCustomHufPrice(g.customHufPrice?.toString() || '')
@@ -194,8 +237,49 @@ export default function BookingGroupModal({
     }
   }, [isOpen, groupId])
 
+  // Initialize room edit states from current booking data
+  const initializeRoomEditStates = (bookings: GroupRoom[]) => {
+    const states: Record<string, RoomEditState> = {}
+    bookings.forEach((booking) => {
+      // Get currently selected optional prices by matching titles
+      const selectedIds = booking.additionalPrices?.map(p => p.title) || []
+      states[booking.roomId] = {
+        guestCount: booking.guestCount,
+        selectedOptionalPriceIds: selectedIds, // We'll match by title initially
+      }
+    })
+    setRoomEditStates(states)
+  }
+
+  // Update guest count for a room
+  const updateRoomGuestCount = (roomId: string, guestCount: number) => {
+    setRoomEditStates(prev => ({
+      ...prev,
+      [roomId]: { ...prev[roomId], guestCount }
+    }))
+    setHasUnsavedRoomChanges(true)
+  }
+
+  // Toggle optional price for a room
+  const toggleRoomOptionalPrice = (roomId: string, priceId: string) => {
+    setRoomEditStates(prev => {
+      const current = prev[roomId]?.selectedOptionalPriceIds || []
+      const hasPrice = current.includes(priceId)
+      return {
+        ...prev,
+        [roomId]: {
+          ...prev[roomId],
+          selectedOptionalPriceIds: hasPrice
+            ? current.filter(id => id !== priceId)
+            : [...current, priceId]
+        }
+      }
+    })
+    setHasUnsavedRoomChanges(true)
+  }
+
   // Calculate prices for the group
-  const calculateGroupPrice = async () => {
+  const calculateGroupPrice = async (useEditStates = false) => {
     if (!group || !group.bookings.length) return
 
     setCalculatingPrice(true)
@@ -206,10 +290,14 @@ export default function BookingGroupModal({
         body: JSON.stringify({
           checkIn: group.checkIn,
           checkOut: group.checkOut,
-          rooms: group.bookings.map((b) => ({
-            roomId: b.roomId,
-            guestCount: b.guestCount,
-          })),
+          rooms: group.bookings.map((b) => {
+            const editState = useEditStates ? roomEditStates[b.roomId] : null
+            return {
+              roomId: b.roomId,
+              guestCount: editState?.guestCount ?? b.guestCount,
+              selectedOptionalPriceIds: editState?.selectedOptionalPriceIds || [],
+            }
+          }),
         }),
       })
 
@@ -217,6 +305,25 @@ export default function BookingGroupModal({
         const data = await res.json()
         setPriceBreakdowns(data.rooms)
         setCalculatedTotal(data.groupTotal)
+
+        // After initial calculation, sync selected optional prices from response
+        if (!useEditStates && data.rooms) {
+          const newStates: Record<string, RoomEditState> = {}
+          data.rooms.forEach((room: RoomPriceBreakdown) => {
+            const booking = group.bookings.find(b => b.roomId === room.roomId)
+            // Match existing additional prices by title to available optional prices
+            const existingTitles = booking?.additionalPrices?.map(p => p.title) || []
+            const matchedIds = room.availableOptionalPrices
+              ?.filter(op => existingTitles.includes(op.title))
+              .map(op => op.id) || []
+
+            newStates[room.roomId] = {
+              guestCount: room.guestCount,
+              selectedOptionalPriceIds: matchedIds,
+            }
+          })
+          setRoomEditStates(newStates)
+        }
       }
     } catch (err) {
       console.error('Error calculating price:', err)
@@ -225,12 +332,21 @@ export default function BookingGroupModal({
     }
   }
 
-  // Calculate prices when group is loaded
+  // Calculate prices when group is loaded (initial)
   useEffect(() => {
     if (group) {
-      calculateGroupPrice()
+      calculateGroupPrice(false)
     }
-  }, [group?.id, group?.checkIn, group?.checkOut, JSON.stringify(group?.bookings.map(b => ({ roomId: b.roomId, guestCount: b.guestCount })))])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group?.id, group?.checkIn, group?.checkOut])
+
+  // Recalculate when room edit states change
+  useEffect(() => {
+    if (group && Object.keys(roomEditStates).length > 0 && hasUnsavedRoomChanges) {
+      calculateGroupPrice(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(roomEditStates)])
 
   // Handle room booking edit - open modal
   const handleEditRoomBooking = (bookingId: string) => {
@@ -244,13 +360,6 @@ export default function BookingGroupModal({
     calculateGroupPrice()
   }
 
-  // Apply calculated price to total
-  const applyCalculatedPrice = () => {
-    if (calculatedTotal !== null) {
-      setTotalAmount(calculatedTotal.toFixed(2))
-    }
-  }
-
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -262,6 +371,7 @@ export default function BookingGroupModal({
       setCheckOut('')
       setArrivalTime('')
       setNotes('')
+      setHasCustomFinalAmount(false)
       setTotalAmount('')
       setHasCustomHufPrice(false)
       setCustomHufPrice('')
@@ -276,15 +386,57 @@ export default function BookingGroupModal({
       setShowRoomEditModal(false)
       setPriceBreakdowns([])
       setCalculatedTotal(null)
+      setExpandedRoomId(null)
+      setRoomEditStates({})
+      setHasUnsavedRoomChanges(false)
     }
   }, [isOpen])
 
   // Handle save
   const handleSave = async () => {
-    if (!groupId) return
+    if (!groupId || !group) return
 
     setSaving(true)
     try {
+      // Save room changes if there are any
+      if (hasUnsavedRoomChanges) {
+        for (const booking of group.bookings) {
+          const editState = roomEditStates[booking.roomId]
+          if (!editState) continue
+
+          // Get the price breakdown to find available optional prices
+          const priceBreakdown = priceBreakdowns.find(p => p.roomId === booking.roomId)
+          if (!priceBreakdown) continue
+
+          // Build additional price selections
+          const additionalPriceSelections = [
+            // Mandatory prices (always included)
+            ...priceBreakdown.mandatoryPrices.map(p => ({
+              sourceId: p.id,
+              sourceType: p.origin,
+            })),
+            // Selected optional prices
+            ...priceBreakdown.availableOptionalPrices
+              .filter(op => editState.selectedOptionalPriceIds.includes(op.id))
+              .map(op => ({
+                sourceId: op.id,
+                sourceType: op.origin,
+              })),
+          ]
+
+          await fetch(`/api/admin/booking-groups/${groupId}/rooms`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookingId: booking.id,
+              guestCount: editState.guestCount,
+              additionalPriceSelections,
+            }),
+          })
+        }
+      }
+
+      // Save group-level changes
       const res = await fetch(`/api/admin/booking-groups/${groupId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -296,6 +448,8 @@ export default function BookingGroupModal({
           checkOut,
           arrivalTime: arrivalTime || null,
           notes: notes || null,
+          calculatedTotalAmount: calculatedTotal,
+          hasCustomFinalAmount,
           totalAmount: totalAmount || null,
           hasCustomHufPrice,
           customHufPrice: hasCustomHufPrice ? customHufPrice : null,
@@ -463,7 +617,7 @@ export default function BookingGroupModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="bg-white rounded-xl w-full max-w-300 max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between bg-indigo-50">
             <div className="flex items-center gap-3">
@@ -605,101 +759,203 @@ export default function BookingGroupModal({
                     </div>
                   </div>
 
-                  {/* Rooms in Group */}
+                  {/* Rooms in Group - Expandable Sections */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-medium text-stone-700">Rooms in Group</h3>
-                      {calculatingPrice && (
-                        <span className="text-xs text-stone-500 flex items-center gap-1">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-stone-500" />
-                          Calculating...
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {hasUnsavedRoomChanges && (
+                          <span className="text-xs text-amber-600 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Unsaved changes
+                          </span>
+                        )}
+                        {calculatingPrice && (
+                          <span className="text-xs text-stone-500 flex items-center gap-1">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-stone-500" />
+                            Calculating...
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="bg-stone-50 rounded-lg border border-stone-200 overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-stone-100">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-stone-500">Room</th>
-                            <th className="px-3 py-2 text-center text-xs font-medium text-stone-500">Guests</th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-stone-500">Calculated</th>
-                            {isEditable && <th className="px-3 py-2 w-10"></th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-200">
-                          {group.bookings.map((booking) => {
-                            const priceInfo = priceBreakdowns.find(p => p.roomId === booking.roomId)
-                            const hasExtras = booking.additionalPrices && booking.additionalPrices.length > 0
+                    <div className="bg-indigo-50 rounded-lg border border-indigo-200 overflow-hidden">
+                      <div className="divide-y divide-indigo-100">
+                        {group.bookings.map((booking) => {
+                          const priceInfo = priceBreakdowns.find(p => p.roomId === booking.roomId)
+                          const editState = roomEditStates[booking.roomId]
+                          const isExpanded = expandedRoomId === booking.roomId
+                          const hasOptionalPrices = (priceInfo?.availableOptionalPrices?.length || 0) > 0
+                          const selectedCount = editState?.selectedOptionalPriceIds?.length || 0
+                          const roomTypeName = booking.room.roomType?.name
+                            ? getLocalizedText(booking.room.roomType.name as Record<string, string>, language)
+                            : ''
 
-                            return (
-                              <tr key={booking.id}>
-                                <td className="px-3 py-2">
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    <span className="text-xs px-1.5 py-0.5 bg-stone-200 text-stone-700 rounded">
-                                      {booking.room.roomType?.building.name}
-                                    </span>
-                                    <span className="font-medium text-stone-900">{booking.room.name}</span>
-                                    {hasExtras && (
-                                      <span className="text-xs px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded" title={booking.additionalPrices.map(p => p.title).join(', ')}>
-                                        +{booking.additionalPrices.length} extra
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 text-center text-stone-600">{booking.guestCount}</td>
-                                <td className="px-3 py-2 text-right">
-                                  {priceInfo ? (
-                                    <span className="text-stone-900">{priceInfo.roomTotal.toFixed(2)} €</span>
-                                  ) : (
-                                    <span className="text-stone-400">-</span>
-                                  )}
-                                </td>
-                                {isEditable && (
-                                  <td className="px-3 py-2">
+                          return (
+                            <div key={booking.id} className="bg-white">
+                              {/* Room Header Row */}
+                              <div
+                                className={`flex items-center justify-between p-3 cursor-pointer hover:bg-stone-50 transition-colors ${isExpanded ? 'bg-stone-50' : ''}`}
+                                onClick={() => isEditable && setExpandedRoomId(isExpanded ? null : booking.roomId)}
+                              >
+                                <div className="flex items-center gap-2 flex-1">
+                                  {isEditable && (
                                     <button
-                                      onClick={() => handleEditRoomBooking(booking.id)}
-                                      className="p-1 text-stone-500 hover:bg-stone-100 rounded cursor-pointer"
-                                      title="Edit room details & extras"
+                                      type="button"
+                                      className="p-0.5 hover:bg-stone-100 rounded"
+                                      onClick={(e) => { e.stopPropagation(); setExpandedRoomId(isExpanded ? null : booking.roomId) }}
                                     >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                      <svg className={`w-4 h-4 text-stone-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                       </svg>
                                     </button>
-                                  </td>
-                                )}
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                        {priceBreakdowns.length > 0 && (
-                          <tfoot className="bg-stone-100">
-                            <tr>
-                              <td colSpan={2} className="px-3 py-2 text-right text-xs font-medium text-stone-600">
-                                Calculated Total:
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-stone-900">
-                                {calculatedTotal?.toFixed(2)} €
-                              </td>
-                              {isEditable && <td></td>}
-                            </tr>
-                          </tfoot>
-                        )}
-                      </table>
+                                  )}
+                                  <span className="text-xs px-1.5 py-0.5 bg-stone-200 text-stone-700 rounded">
+                                    {booking.room.roomType?.building.name}
+                                  </span>
+                                  <span className="font-medium text-stone-900 text-xs">{booking.room.name}</span>
+                                  {roomTypeName && (
+                                    <span className="text-xs text-stone-500">({roomTypeName})</span>
+                                  )}
+                                  {selectedCount > 0 && (
+                                    <span className="text-xs px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded">
+                                      +{selectedCount} extra{selectedCount > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-sm text-stone-600 flex items-center gap-1 pl-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         className="lucide lucide-user-round-icon lucide-user-round"><circle cx="12"
+                                                                                                             cy="8"
+                                                                                                             r="5"/><path
+                                        d="M20 21a8 8 0 0 0-16 0"/></svg>
+                                    {editState?.guestCount ?? booking.guestCount}
+                                  </span>
+                                  <span className="text-sm font-medium text-stone-900 min-w-[70px] text-right">
+                                    €{priceInfo?.roomTotal?.toFixed(2) || '0.00'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Expanded Content */}
+                              {isExpanded && priceInfo && (
+                                <div className="px-3 pb-3 border-t border-stone-100 bg-stone-50">
+                                  {/* Accommodation */}
+                                  <div className="mt-3 mb-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-stone-600">Accommodation ({group.nights} nights)</span>
+                                      <span className="text-stone-700">€{priceInfo.accommodationTotal.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Mandatory Extras (read-only) */}
+                                  {priceInfo.mandatoryPrices.length > 0 && (
+                                    <div className="mb-3">
+                                      <p className="text-xs text-stone-500 mb-1.5 font-medium">Mandatory extras:</p>
+                                      <div className="space-y-1.5">
+                                        {priceInfo.mandatoryPrices.map((mp) => (
+                                          <div key={mp.id} className="flex items-center justify-between text-sm bg-amber-50 rounded px-2 py-1.5 border border-amber-200">
+                                            <div className="flex items-center gap-2">
+                                              <input type="checkbox" checked disabled className="rounded border-amber-300 text-amber-600 cursor-not-allowed" />
+                                              <span className="text-amber-800">
+                                                {mp.title}
+                                                <span className="text-amber-600 ml-1 text-xs">
+                                                  (€{mp.priceEur}{mp.perNight ? '/night' : ''}{mp.perGuest ? '/guest' : ''} × {mp.quantity})
+                                                </span>
+                                              </span>
+                                            </div>
+                                            <span className="text-amber-800 font-medium">€{mp.total.toFixed(2)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Optional Extras (editable) */}
+                                  {hasOptionalPrices && (
+                                    <div className="mb-3">
+                                      <p className="text-xs text-stone-500 mb-1.5 font-medium">Optional extras:</p>
+                                      <div className="space-y-1.5">
+                                        {priceInfo.availableOptionalPrices.map((op) => {
+                                          const isSelected = editState?.selectedOptionalPriceIds?.includes(op.id) || false
+                                          const selectedInfo = priceInfo.optionalPrices?.find(p => p.id === op.id)
+                                          // Calculate what the total would be
+                                          let quantity = 1
+                                          if (op.perNight) quantity = group.nights || 1
+                                          if (op.perGuest) quantity *= editState?.guestCount || booking.guestCount
+                                          const estimatedTotal = op.priceEur * quantity
+
+                                          return (
+                                            <label
+                                              key={op.id}
+                                              className={`flex items-center justify-between text-sm rounded px-2 py-1.5 cursor-pointer transition-colors ${
+                                                isSelected ? 'bg-indigo-50 border border-indigo-200' : 'bg-white border border-stone-200 hover:bg-stone-50'
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isSelected}
+                                                  onChange={() => toggleRoomOptionalPrice(booking.roomId, op.id)}
+                                                  className="rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                />
+                                                <span className={isSelected ? 'text-indigo-800' : 'text-stone-700'}>
+                                                  {op.title}
+                                                  <span className={`ml-1 text-xs ${isSelected ? 'text-indigo-600' : 'text-stone-500'}`}>
+                                                    (€{op.priceEur}{op.perNight ? '/night' : ''}{op.perGuest ? '/guest' : ''})
+                                                  </span>
+                                                </span>
+                                              </div>
+                                              {isSelected && (
+                                                <span className="text-indigo-700 font-medium">+€{selectedInfo?.total?.toFixed(2) || estimatedTotal.toFixed(2)}</span>
+                                              )}
+                                            </label>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Guest Count Selector */}
+                                  <div className="flex items-center justify-between py-2 border-t border-stone-200">
+                                    <label className="text-sm text-stone-600">Number of guests:</label>
+                                    <select
+                                      value={editState?.guestCount ?? booking.guestCount}
+                                      onChange={(e) => updateRoomGuestCount(booking.roomId, parseInt(e.target.value))}
+                                      className="px-2 py-1 border border-stone-300 rounded text-sm cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    >
+                                      {Array.from({ length: booking.room.roomType?.capacity || 10 }, (_, i) => i + 1).map((n) => (
+                                        <option key={n} value={n}>{n}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Room Subtotal */}
+                                  <div className="flex items-center justify-between pt-2 border-t border-stone-200">
+                                    <span className="text-sm font-medium text-stone-700">Room Subtotal:</span>
+                                    <span className="text-base font-bold text-stone-900">€{priceInfo.roomTotal.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Group Total Footer */}
+                      {priceBreakdowns.length > 0 && (
+                        <div className="bg-indigo-100 px-3 py-2 flex items-center justify-between border-t border-indigo-200">
+                          <span className="text-sm font-medium text-indigo-700">Calculated Total:</span>
+                          <span className="text-lg font-bold text-indigo-700">€{calculatedTotal?.toFixed(2) || '0.00'}</span>
+                        </div>
+                      )}
                     </div>
-                    {/* Apply calculated price button */}
-                    {isEditable && calculatedTotal !== null && calculatedTotal !== parseFloat(totalAmount || '0') && (
-                      <button
-                        onClick={applyCalculatedPrice}
-                        className="mt-2 w-full px-3 py-2 text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        Apply Calculated Price ({calculatedTotal.toFixed(2)} €)
-                      </button>
-                    )}
                     <p className="text-xs text-stone-500 mt-2">
-                      Prices auto-calculated based on room rates and mandatory fees. Edit rooms to recalculate.
+                      Click on a room to expand and edit additional services. Changes are saved when you click Save Changes.
                     </p>
                   </div>
                 </div>
@@ -786,39 +1042,108 @@ export default function BookingGroupModal({
                   <div className="bg-stone-50 rounded-lg border border-stone-200 p-4">
                     <h3 className="text-sm font-medium text-stone-700 mb-3">Pricing</h3>
                     <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs text-stone-500 mb-1">Total Amount (EUR)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={totalAmount}
-                          onChange={(e) => setTotalAmount(e.target.value)}
-                          disabled={!isEditable}
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-stone-100"
-                        />
+                      {/* Calculated Total Display */}
+                      {calculatedTotal !== null && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-stone-600">Calculated Total:</span>
+                          <span className={`font-medium ${hasCustomFinalAmount && totalAmount ? 'text-stone-400' : 'text-stone-900'}`}>
+                            €{calculatedTotal.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Custom Final Amount (EUR) */}
+                      <div className={`rounded-lg p-3 ${hasCustomFinalAmount ? 'bg-orange-50 border border-orange-200' : 'bg-white border border-stone-200'}`}>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={hasCustomFinalAmount}
+                            onChange={(e) => {
+                              setHasCustomFinalAmount(e.target.checked)
+                              if (!e.target.checked && calculatedTotal !== null) {
+                                setTotalAmount(calculatedTotal.toFixed(2))
+                              }
+                            }}
+                            disabled={!isEditable}
+                            className="rounded border-stone-300 text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-stone-700">Custom Final Amount (EUR)</span>
+                        </label>
+                        {hasCustomFinalAmount && (
+                          <div className="mt-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-stone-500">€</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={totalAmount}
+                                onChange={(e) => setTotalAmount(e.target.value)}
+                                disabled={!isEditable}
+                                placeholder={calculatedTotal?.toFixed(2) || '0.00'}
+                                className="flex-1 px-2 py-1.5 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white disabled:bg-stone-100"
+                              />
+                            </div>
+                            <p className="text-xs text-orange-600 mt-1">
+                              Custom agreement price. Room calculations unchanged.
+                            </p>
+                          </div>
+                        )}
+                        {!hasCustomFinalAmount && (
+                          <div className="mt-2">
+                            <input
+                              type="hidden"
+                              value={calculatedTotal?.toFixed(2) || totalAmount}
+                            />
+                            <div className="flex items-center justify-between text-sm text-stone-600">
+                              <span>Final Amount:</span>
+                              <span className="font-medium text-stone-900">€{totalAmount || calculatedTotal?.toFixed(2) || '0.00'}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="flex items-center gap-2 cursor-pointer mb-2">
+
+                      {/* Custom HUF Price */}
+                      <div className={`rounded-lg p-3 ${hasCustomHufPrice ? 'bg-purple-50 border border-purple-200' : 'bg-white border border-stone-200'}`}>
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={hasCustomHufPrice}
-                            onChange={(e) => setHasCustomHufPrice(e.target.checked)}
+                            onChange={(e) => {
+                              setHasCustomHufPrice(e.target.checked)
+                              if (!e.target.checked) setCustomHufPrice('')
+                            }}
                             disabled={!isEditable}
                             className="rounded border-stone-300 text-purple-600 focus:ring-purple-500"
                           />
-                          <span className="text-sm text-stone-700">Custom HUF Price</span>
+                          <span className="text-sm text-stone-700">Custom HUF Price (Special Agreement)</span>
                         </label>
                         {hasCustomHufPrice && (
-                          <input
-                            type="number"
-                            value={customHufPrice}
-                            onChange={(e) => setCustomHufPrice(e.target.value)}
-                            disabled={!isEditable}
-                            placeholder="Enter HUF amount"
-                            className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-purple-50 disabled:bg-stone-100"
-                          />
+                          <div className="mt-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={customHufPrice}
+                                onChange={(e) => setCustomHufPrice(e.target.value)}
+                                disabled={!isEditable}
+                                placeholder="95000"
+                                className="flex-1 px-2 py-1.5 border border-purple-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white disabled:bg-stone-100"
+                              />
+                              <span className="text-stone-500">Ft</span>
+                            </div>
+                            <p className="text-xs text-purple-600 mt-1">
+                              Separate HUF amount. Does not replace EUR price.
+                            </p>
+                          </div>
                         )}
                       </div>
+
+                      {/* Final Amount Summary */}
+                      {hasCustomFinalAmount && totalAmount && (
+                        <div className="flex items-center justify-between bg-orange-100 rounded-lg p-2 mt-2">
+                          <span className="text-sm font-medium text-orange-700">Final Amount:</span>
+                          <span className="text-lg font-bold text-orange-700">€{parseFloat(totalAmount).toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

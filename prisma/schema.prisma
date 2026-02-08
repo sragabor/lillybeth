@@ -210,24 +210,26 @@ model CalendarOverride {
 // BookingGroup: Container for multi-room bookings
 // Holds shared guest information and aggregated totals
 model BookingGroup {
-  id                String        @id @default(cuid())
+  id                     String        @id @default(cuid())
   // Guest information (single source of truth for grouped bookings)
-  guestName         String
-  guestEmail        String?
-  guestPhone        String?
+  guestName              String
+  guestEmail             String?
+  guestPhone             String?
   // Shared booking metadata
-  source            BookingSource @default(MANUAL)
-  checkIn           DateTime      @db.Date
-  checkOut          DateTime      @db.Date
-  arrivalTime       String?
-  notes             String?
+  source                 BookingSource @default(MANUAL)
+  checkIn                DateTime      @db.Date
+  checkOut               DateTime      @db.Date
+  arrivalTime            String?
+  notes                  String?
   // Aggregated status
-  status            BookingStatus @default(INCOMING)
-  paymentStatus     PaymentStatus @default(PENDING)
-  // Aggregated pricing (sum of all room totals + group-level additional prices)
-  totalAmount       Float?
-  hasCustomHufPrice Boolean       @default(false)
-  customHufPrice    Float?
+  status                 BookingStatus @default(INCOMING)
+  paymentStatus          PaymentStatus @default(PENDING)
+  // Aggregated pricing
+  calculatedTotalAmount  Float?        // Always auto-computed sum of room totals (for reference)
+  totalAmount            Float?        // Final agreed price (may differ from calculated if custom)
+  hasCustomFinalAmount   Boolean       @default(false) // True if totalAmount is a custom agreement
+  hasCustomHufPrice      Boolean       @default(false)
+  customHufPrice         Float?
   // Status tracking (applies to whole group)
   invoiceSent       Boolean       @default(false)
   vendegem          Boolean       @default(false)
