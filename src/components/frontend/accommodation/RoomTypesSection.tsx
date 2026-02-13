@@ -58,7 +58,7 @@ export function RoomTypesSection({
 
   return (
     <section id="room-types" className="py-16 md:py-24 px-4 bg-stone-50">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div
           ref={ref}
           className={`
@@ -72,7 +72,8 @@ export function RoomTypesSection({
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Vertical list layout */}
+        <div className="space-y-8">
           {roomTypes.map((roomType, index) => (
             <RoomTypeCard
               key={roomType.id}

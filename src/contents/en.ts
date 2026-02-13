@@ -42,6 +42,9 @@ export const en = {
     subtitle: 'Each property offers a unique experience at Lake Balaton',
     viewAll: 'View All Properties',
     viewDetails: 'View Details',
+    learnMore: 'Learn more',
+    capacity: 'Up to {count} guests',
+    capacitySingular: '1 guest',
   },
 
   // About Section

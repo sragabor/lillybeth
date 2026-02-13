@@ -176,21 +176,33 @@ export function AccommodationDetailPage({ slug, routeLanguage }: AccommodationDe
   // Use the single slug (same for all languages)
   const currentSlug = accommodation.slug || slug;
 
+  // Calculate total capacity from room types
+  const totalCapacity = accommodation.roomTypes.reduce((sum, rt) => sum + rt.capacity, 0);
+
+  // Get a short highlight text from description (first sentence or first 100 chars)
+  const fullDescription = getLocalizedText(accommodation.description);
+  const highlightText = fullDescription
+    ? fullDescription.split('.')[0] + (fullDescription.includes('.') ? '.' : '')
+    : undefined;
+
   return (
     <>
-      {/* Hero Slider */}
+      {/* Hero Slider with overlay content */}
       <AccommodationHeroSlider
         images={accommodation.images}
         title={accommodationName}
+        address={accommodation.address}
+        capacity={totalCapacity}
+        highlightText={highlightText && highlightText.length <= 150 ? highlightText : undefined}
       />
 
-      {/* Booking Search */}
+      {/* Booking Search - overlaps hero */}
       <AccommodationBookingSearch
         accommodationId={accommodation.id}
         accommodationSlug={currentSlug}
       />
 
-      {/* Description */}
+      {/* Description with collapsible content */}
       <AccommodationDescription
         description={getLocalizedText(accommodation.description)}
       />
@@ -200,7 +212,7 @@ export function AccommodationDetailPage({ slug, routeLanguage }: AccommodationDe
         <AccommodationGallery images={accommodation.images} />
       )}
 
-      {/* Amenities */}
+      {/* Amenities with collapsible content */}
       {accommodation.amenityCategories.length > 0 && (
         <AccommodationAmenities
           amenityCategories={accommodation.amenityCategories}
@@ -217,21 +229,21 @@ export function AccommodationDetailPage({ slug, routeLanguage }: AccommodationDe
         getLocalizedText={getLocalizedText}
       />
 
-      {/* Location */}
-      {(accommodation.latitude && accommodation.longitude) && (
-        <AccommodationLocation
-          latitude={accommodation.latitude}
-          longitude={accommodation.longitude}
-          address={accommodation.address}
-        />
-      )}
-
-      {/* Room Types */}
+      {/* Room Types - vertical list with image left layout */}
       {accommodation.roomTypes.length > 0 && (
         <RoomTypesSection
           roomTypes={accommodation.roomTypes}
           accommodationId={accommodation.id}
           getLocalizedText={getLocalizedText}
+        />
+      )}
+
+      {/* Location with premium map styling */}
+      {(accommodation.latitude && accommodation.longitude) && (
+        <AccommodationLocation
+          latitude={accommodation.latitude}
+          longitude={accommodation.longitude}
+          address={accommodation.address}
         />
       )}
 

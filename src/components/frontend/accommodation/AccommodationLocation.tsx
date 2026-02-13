@@ -17,12 +17,14 @@ export function AccommodationLocation({
   const { t, language } = useFrontendLanguage();
   const { ref, isVisible } = useScrollAnimation();
 
+  // Premium grayscale/minimal style map using Static Maps API styling
+  // Note: For production, consider using Google Maps JavaScript API with custom styling
   const mapUrl = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2000!2d${longitude}!3d${latitude}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zM!5e0!3m2!1s${language}!2shu!4v1!5m2!1s${language}!2shu`;
 
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
 
   return (
-    <section className="py-16 md:py-24 px-4">
+    <section className="py-16 md:py-24 px-4 bg-stone-50">
       <div className="max-w-6xl mx-auto">
         <div
           ref={ref}
@@ -38,8 +40,8 @@ export function AccommodationLocation({
             {t.map.subtitle}
           </p>
 
-          <div className="bg-stone-100 rounded-2xl overflow-hidden shadow-sm">
-            {/* Map Container */}
+          <div className="bg-white rounded-2xl overflow-hidden shadow-lg">
+            {/* Map Container with grayscale filter for premium look */}
             <div className="relative aspect-[16/9] md:aspect-[21/9]">
               <iframe
                 src={mapUrl}
@@ -49,41 +51,45 @@ export function AccommodationLocation({
                 allowFullScreen
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                className="absolute inset-0"
+                className="absolute inset-0 grayscale contrast-[1.1] hover:grayscale-0 transition-all duration-500"
               />
+              {/* Subtle overlay for premium feel */}
+              <div className="absolute inset-0 bg-stone-900/5 pointer-events-none" />
             </div>
 
             {/* Address Bar */}
-            <div className="p-6 bg-white flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="p-6 md:p-8 bg-white flex flex-col md:flex-row items-center justify-between gap-4 border-t border-stone-100">
               {address && (
                 <div className="flex items-center gap-3 text-stone-700">
-                  <svg
-                    className="w-5 h-5 text-stone-500 flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
-                    />
-                  </svg>
-                  <span>{address}</span>
+                  <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center flex-shrink-0">
+                    <svg
+                      className="w-5 h-5 text-stone-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-sm md:text-base">{address}</span>
                 </div>
               )}
               <a
                 href={directionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-stone-800 text-white rounded-lg font-medium hover:bg-stone-700 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-stone-800 text-white rounded-xl font-medium hover:bg-stone-700 transition-colors shadow-sm hover:shadow-md"
               >
                 <svg
                   className="w-5 h-5"

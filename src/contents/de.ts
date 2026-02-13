@@ -42,6 +42,9 @@ export const de = {
     subtitle: 'Jedes Haus bietet ein einzigartiges Erlebnis am Plattensee',
     viewAll: 'Alle Häuser ansehen',
     viewDetails: 'Details ansehen',
+    learnMore: 'Mehr erfahren',
+    capacity: 'Bis zu {count} Gäste',
+    capacitySingular: '1 Gast',
   },
 
   // About Section

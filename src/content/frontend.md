@@ -147,49 +147,96 @@ Examples:
 
 ---
 
-## 6. Accommodations Listing Page
+## 6. Accommodations Listing Page (Buildings List)
 
 Path examples:
 - /frontend/accommodation
 - /frontend/szallas
 - /frontend/unterkunft
 
-Content:
+### Content
 - List of all accommodations (buildings)
-- Image, name, key info
-- Clickable cards
 - Fully localized UI
+
+### Building Card Content
+Each building card must display:
+- Cover image
+- Building name
+- Short basic info (capacity / short description)
+
+### Building Card Image Slider
+Each building card must contain a horizontal image slider:
+- Maximum 10 images
+- Swipeable / draggable on mobile
+- After the last image, there must be a dedicated slide:
+  - CTA: "Learn more" (label from i18n)
+  - Clicking navigates to the building detail page
+
+### Card Design Requirements
+- Premium design
+- Image-first layout
+- Touch-friendly interactions
+- Smooth slider transitions
+
+### Responsive Layout
+- Mobile: 1 column
+- Tablet: 2 columns
+- Desktop: 2–3 columns depending on width
 
 ---
 
 ## 7. Accommodation Detail Page (Building Page)
 
-### Layout
+### 7.1 Hero Section
+- Full-width image slider (building gallery)
+- Touch & swipe supported
+- Subtle animations allowed (fade / parallax)
+- Overlay content:
+  - Building name
+  - Key info (location, capacity, short highlight text)
 
-#### Top Section
-- Full-width image slider (same style as homepage)
-- Title
-- Booking widget (searches only within this accommodation)
+### 7.2 Booking Search (Filtered to Building)
+- Same booking search UI as homepage:
+  - Start date
+  - End date
+  - Guest number
+- Search must be pre-filtered to this building only
+- UI and UX must be identical to homepage booking search
+- Visually overlaps the hero section slightly (premium hotel-style layout)
 
-#### Description
-- Building description (from admin, multilingual)
+### 7.3 Description & Amenities
+- Accommodation description from admin
+- Amenities list from admin
+- If long:
+  - Collapsed by default
+  - Expandable via "Show more" (label from i18n)
 
-#### Gallery
+### 7.4 Gallery
 - Accommodation images
 - Swipeable / lightbox viewer
 
-#### Amenities
-- List from admin
-- Icons + labels
-- Show more / show less if many items
+### 7.5 Rooms List
+- Rooms displayed vertically
+- Each room card contains:
+  - Image slider
+  - Room name
+  - Capacity
+  - Short description
+  - "From" price (lowest available price, label from i18n)
+  - CTA: Book / View availability (label from i18n)
+- Layout:
+  - Mobile-first stacked
+  - Desktop: image left, content right
 
-#### House Rules & Booking Conditions
+### 7.6 House Rules & Booking Conditions
 - From admin
 - Structured and readable
 
-#### Location
-- Google Maps
-- Address displayed
+### 7.7 Map Section
+- Embedded Google Map
+- Exact building location
+- Address displayed near map
+- Premium map styling (minimal / grayscale if possible)
 
 ---
 
@@ -202,9 +249,9 @@ For each room type:
 - Capacity
 - Key amenities
 - Price indication:
-  - “From EUR X / night”
+  - "From EUR X / night" (label from i18n)
 - CTA button:
-  - Book this room type
+  - Book this room type (label from i18n)
 
 ---
 
@@ -256,6 +303,26 @@ Planned later:
 - Replace existing landing page
 - Analytics integration
 - CMS-like website admin
+
+---
+
+## 14. Global Frontend Notes
+
+### Performance
+- SEO-friendly structure
+- Lazy-loaded images
+- Optimized sliders (avoid heavy libraries)
+
+### Internationalization (i18n)
+All UI labels must come from i18n files, including:
+- "Learn more"
+- "From"
+- "Guests"
+- "Show more"
+- "Book"
+- "View availability"
+- All button texts
+- All section titles
 
 ---
 

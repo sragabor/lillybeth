@@ -30,14 +30,14 @@ export function AccommodationBookingSearch({
   };
 
   return (
-    <section id="booking-search" className="relative -mt-8 z-10 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+    <section id="booking-search" className="relative -mt-20 z-10 px-4">
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 border border-stone-100">
           <h2 className="text-xl font-serif font-semibold text-stone-800 mb-6 text-center">
             {t.accommodation.checkAvailability}
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             {/* Date Range Picker */}
             <div className="md:col-span-2">
               <DateRangePicker
@@ -57,7 +57,7 @@ export function AccommodationBookingSearch({
                 <select
                   value={guests}
                   onChange={(e) => setGuests(Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-800 appearance-none cursor-pointer hover:border-stone-300 transition-colors shadow-sm"
+                  className="w-full px-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-800 appearance-none cursor-pointer hover:border-stone-300 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-stone-400"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                     <option key={num} value={num}>
@@ -75,16 +75,16 @@ export function AccommodationBookingSearch({
                 </svg>
               </div>
             </div>
-          </div>
 
-          {/* Search Button */}
-          <div className="mt-6">
-            <button
-              onClick={handleSearch}
-              className="w-full px-6 py-3 bg-stone-800 text-white rounded-xl font-medium hover:bg-stone-700 transition-colors"
-            >
-              {t.search.searchButton}
-            </button>
+            {/* Search Button */}
+            <div>
+              <button
+                onClick={handleSearch}
+                className="w-full px-6 py-3 bg-stone-800 text-white rounded-xl font-medium hover:bg-stone-700 transition-colors shadow-lg hover:shadow-xl"
+              >
+                {t.search.searchButton}
+              </button>
+            </div>
           </div>
         </div>
       </div>

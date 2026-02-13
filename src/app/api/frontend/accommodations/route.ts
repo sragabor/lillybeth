@@ -17,7 +17,7 @@ export async function GET() {
       include: {
         images: {
           orderBy: { order: 'asc' },
-          take: 1, // Only get the first image for listing
+          take: 10, // Get up to 10 images for listing slider
         },
         roomTypes: {
           include: {
@@ -34,8 +34,6 @@ export async function GET() {
       );
       const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : null;
 
-      const firstImage = accommodation.images[0];
-
       // Get the name as string for slug generation
       let nameStr = '';
       if (typeof accommodation.name === 'string') {
@@ -45,15 +43,23 @@ export async function GET() {
         nameStr = nameObj['en'] || nameObj['hu'] || Object.values(nameObj)[0] || '';
       }
 
+      // Calculate total capacity from room types
+      const totalCapacity = accommodation.roomTypes.reduce((sum, rt) => sum + (rt.capacity || 0), 0);
+
       return {
         id: accommodation.id,
         name: accommodation.name,
         slug: accommodation.slug || generateSlug(nameStr),
         description: accommodation.description,
         address: accommodation.address,
-        image: firstImage ? { id: firstImage.id, url: firstImage.url, alt: firstImage.filename || null } : null,
+        images: accommodation.images.map((img) => ({
+          id: img.id,
+          url: img.url,
+          alt: img.filename || null,
+        })),
         minPrice,
         roomCount: accommodation.roomTypes.length,
+        totalCapacity,
       };
     });
 

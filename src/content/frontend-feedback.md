@@ -1,76 +1,80 @@
-# Frontend Feedback – Slugs & Accommodation Listing
+# feedback.md
 
-## 1. Slug-based Routing (CRITICAL)
+## Frontend – Accommodation Listing & Detail Pages
 
-Accommodation pages must be identified by **slug**, not by ID.
+### 1. Accommodation Listing Page (Buildings list)
 
-- URL example (EN):
-    - `/frontend/accommodation/lake-house`
-- The slug must be stored and managed per language.
-
----
-
-## 2. Multilingual Slugs
-
-Slugs must be **language-specific**.
-
-Examples:
-- EN: `/frontend/accommodation/lake-house`
-- HU: `/frontend/szallas/tavi-haz`
-- DE: `/frontend/unterkunft/see-haus`
-
-Rules:
-- Slugs must NOT fall back to English
-- Each accommodation must have:
-    - `slug_en`
-    - `slug_hu`
-    - `slug_de`
-- Frontend routing must respect the selected language
+- The Accommodation menu page must display all buildings with:
+  - Cover image
+  - Building name
+  - Short basic info (capacity / short description)
+- Each building card must contain a horizontal image slider:
+  - Maximum 10 images
+  - Swipeable / draggable on mobile
+  - After the last image, there must be a dedicated slide:
+    - CTA: "Learn more"
+    - Clicking navigates to the building detail page
+- The card design must feel:
+  - Premium
+  - Image-first
+  - Touch-friendly
+- Fully responsive layout:
+  - Mobile: 1 column
+  - Tablet: 2 columns
+  - Desktop: 2–3 columns depending on width
 
 ---
 
-## 3. Accommodation Listing Page
+### 2. Accommodation Detail Page (Building detail)
 
-Under the **Accommodations (Szállások / Unterkünfte)** menu item:
+#### 2.1 Hero Section
+- Full-width image slider (building gallery)
+- Overlay:
+  - Building name
+  - Key info (location, capacity, short highlight text)
+- Touch & swipe supported
+- Subtle animations allowed (fade / parallax)
 
-- Display **all accommodations (buildings)**
-- Each accommodation card must include:
-    - Featured image
-    - Accommodation name
-    - Short description
-    - Key info (e.g. location, number of room types)
-    - CTA button: “View accommodation”
+#### 2.2 Booking Search (Filtered to building)
+- Same booking search UI as homepage:
+  - Start date
+  - End date
+  - Guest number
+- Search must be pre-filtered to this building only
+- UI and UX must be identical to homepage booking search
+- Visually overlaps the hero section slightly (premium hotel-style layout)
 
-Layout requirements:
-- Responsive grid
-- Works well with:
-    - 1 accommodation
-    - 2 accommodations
-    - 3+ accommodations
-- Clicking a card navigates to the accommodation detail page using the correct language slug
+#### 2.3 Description & Amenities
+- Accommodation description from admin
+- Amenities list from admin
+- If long:
+  - Collapsed by default
+  - Expandable via "Show more"
+
+#### 2.4 Rooms List
+- Rooms displayed vertically
+- Each room card:
+  - Image slider
+  - Room name
+  - Capacity
+  - Short description
+  - "From" price (lowest available price)
+  - CTA: Book / View availability
+- Layout:
+  - Mobile-first stacked
+  - Desktop: image left, content right
+
+#### 2.5 Map Section
+- Embedded Google Map
+- Exact building location
+- Address displayed near map
+- Premium map styling (minimal / grayscale if possible)
 
 ---
 
-## 4. Menu Label Localization
+## Global Frontend Notes
 
-Menu labels must be localized:
-
-- EN: Accommodations
-- HU: Szállások
-- DE: Unterkünfte
-
-The URL segment must also be localized:
-- EN: `/frontend/accommodation`
-- HU: `/frontend/szallas`
-- DE: `/frontend/unterkunft`
-
----
-
-## 5. Data Consistency Rules
-
-- Slug resolution must:
-    - Work on direct page load (no client-only routing)
-    - Support refresh and deep linking
-- If a slug is not found:
-    - Show a friendly 404 page
-    - Do NOT silently redirect to another language
+- SEO-friendly structure
+- Lazy-loaded images
+- Optimized sliders (avoid heavy libraries)
+- "Learn more", "From", "Guests" labels must come from i18n files

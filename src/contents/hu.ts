@@ -42,6 +42,9 @@ export const hu = {
     subtitle: 'Minden épület egyedi élményt kínál a Balatonnál',
     viewAll: 'Összes épület',
     viewDetails: 'Részletek',
+    learnMore: 'Tudjon meg többet',
+    capacity: 'Max. {count} fő',
+    capacitySingular: '1 fő',
   },
 
   // About Section
