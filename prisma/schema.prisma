@@ -21,6 +21,7 @@ model User {
 model Building {
   id                 String                    @id @default(cuid())
   name               String
+  slug               String?                   @unique
   address            String?
   latitude           Float?
   longitude          Float?
