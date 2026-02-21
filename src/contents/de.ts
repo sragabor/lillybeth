@@ -181,6 +181,8 @@ Wir glauben daran, ein außergewöhnliches Gästeerlebnis zu bieten, das bereits
     summary: 'Buchungsübersicht',
     additionalServices: 'Zusätzliche Leistungen',
     mandatory: 'Erforderlich',
+    room: 'Zimmer',
+    perNight: 'Nacht',
     accommodationTotal: 'Unterkunft',
     additionalTotal: 'Zusätzliche Leistungen',
     total: 'Gesamt',
@@ -202,5 +204,7 @@ Wir glauben daran, ein außergewöhnliches Gästeerlebnis zu bieten, das bereits
     contactUs: 'Kontaktieren Sie uns bei Fragen',
     questions: 'Haben Sie Fragen?',
     contactSupport: 'Kontaktieren Sie unser Support-Team',
+    noBookingFound: 'Keine Buchung gefunden',
+    noBookingDescription: 'Wir konnten keine Buchungsdaten finden. Bitte starten Sie eine neue Suche.',
   },
 };

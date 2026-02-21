@@ -181,6 +181,8 @@ Hiszünk abban, hogy a kivételes vendégélmény már a tervezésnél elkezdőd
     summary: 'Foglalás összegzése',
     additionalServices: 'Kiegészítő szolgáltatások',
     mandatory: 'Kötelező',
+    room: 'Szoba',
+    perNight: 'éjszaka',
     accommodationTotal: 'Szállás',
     additionalTotal: 'Kiegészítő szolgáltatások',
     total: 'Összesen',
@@ -202,5 +204,7 @@ Hiszünk abban, hogy a kivételes vendégélmény már a tervezésnél elkezdőd
     contactUs: 'Lépjen kapcsolatba velünk, ha kérdése van',
     questions: 'Kérdése van?',
     contactSupport: 'Lépjen kapcsolatba ügyfélszolgálatunkkal',
+    noBookingFound: 'Foglalás nem található',
+    noBookingDescription: 'Nem találtuk a foglalás adatait. Kérjük, indítson új keresést.',
   },
 };

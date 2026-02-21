@@ -13,6 +13,13 @@ interface AdditionalPriceInput {
   quantity: number;
 }
 
+// Per-room selection: roomTypeId -> roomIndex -> priceId[]
+interface PerRoomPriceSelection {
+  [roomTypeId: string]: {
+    [roomIndex: number]: string[];
+  };
+}
+
 interface RoomBookingData {
   roomId: string;
   guestCount: number;
@@ -38,7 +45,8 @@ export async function POST(request: NextRequest) {
     const checkIn = new Date(data.checkIn);
     const checkOut = new Date(data.checkOut);
     const items: CartItem[] = data.items;
-    const selectedPriceIds: string[] = data.selectedPriceIds || [];
+    const selectedBuildingPriceIds: string[] = data.selectedBuildingPriceIds || [];
+    const perRoomSelections: PerRoomPriceSelection = data.perRoomSelections || {};
 
     if (checkOut <= checkIn) {
       return NextResponse.json({ error: 'Check-out must be after check-in' }, { status: 400 });
@@ -49,6 +57,8 @@ export async function POST(request: NextRequest) {
     // Collect all room bookings data
     const roomBookings: RoomBookingData[] = [];
     let calculatedTotalAmount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buildingAdditionalPrices: any[] = [];
 
     for (const item of items) {
       // Get room type with pricing and available rooms
@@ -136,59 +146,81 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Collect additional prices for this room type
-      const roomAdditionalPrices: AdditionalPriceInput[] = [];
-      const guestCount = item.guestCount || roomType.capacity;
+      const totalGuestCount = item.guestCount || (roomType.capacity * item.quantity);
+      const guestsPerRoom = Math.ceil(totalGuestCount / item.quantity);
+      const roomTypeSelections = perRoomSelections[item.roomTypeId] || {};
 
-      // Building-level additional prices
-      for (const price of roomType.building.additionalPrices) {
-        if (price.mandatory || selectedPriceIds.includes(price.id)) {
-          const titleObj = price.title as Record<string, string>;
-          const title = titleObj?.en || titleObj?.hu || 'Additional fee';
-          const nightMultiplier = price.perNight ? nights : 1;
-          const guestMultiplier = price.perGuest ? guestCount : 1;
-          const quantity = nightMultiplier * guestMultiplier;
+      // Create bookings for each room with per-room additional prices
+      for (let roomIndex = 0; roomIndex < item.quantity; roomIndex++) {
+        const room = availableRooms[roomIndex];
+        const roomSelections = roomTypeSelections[roomIndex] || [];
+        const roomAdditionalPrices: AdditionalPriceInput[] = [];
 
-          roomAdditionalPrices.push({
-            title,
-            priceEur: price.priceEur,
-            quantity,
-          });
+        // Room type-level additional prices (per room selection)
+        for (const price of roomType.additionalPrices) {
+          if (price.mandatory || roomSelections.includes(price.id)) {
+            const titleObj = price.title as Record<string, string>;
+            const title = titleObj?.en || titleObj?.hu || 'Additional fee';
+            const nightMultiplier = price.perNight ? nights : 1;
+            const guestMultiplier = price.perGuest ? guestsPerRoom : 1;
+            const quantity = nightMultiplier * guestMultiplier;
+
+            roomAdditionalPrices.push({
+              title,
+              priceEur: price.priceEur,
+              quantity,
+            });
+          }
         }
-      }
 
-      // Room type-level additional prices
-      for (const price of roomType.additionalPrices) {
-        if (price.mandatory || selectedPriceIds.includes(price.id)) {
-          const titleObj = price.title as Record<string, string>;
-          const title = titleObj?.en || titleObj?.hu || 'Additional fee';
-          const nightMultiplier = price.perNight ? nights : 1;
-          const guestMultiplier = price.perGuest ? guestCount : 1;
-          const quantity = nightMultiplier * guestMultiplier;
+        // Calculate total for this room
+        const additionalTotal = roomAdditionalPrices.reduce((sum, p) => sum + p.priceEur * p.quantity, 0);
+        const roomTotal = roomTypeAccommodationTotal + additionalTotal;
 
-          roomAdditionalPrices.push({
-            title,
-            priceEur: price.priceEur,
-            quantity,
-          });
-        }
-      }
-
-      // Calculate total for this room
-      const additionalTotal = roomAdditionalPrices.reduce((sum, p) => sum + p.priceEur * p.quantity, 0);
-      const roomTotal = roomTypeAccommodationTotal + additionalTotal;
-
-      // Create bookings for each room
-      for (let i = 0; i < item.quantity; i++) {
-        const room = availableRooms[i];
         roomBookings.push({
           roomId: room.id,
-          guestCount,
+          guestCount: guestsPerRoom,
           totalAmount: roomTotal,
           additionalPrices: roomAdditionalPrices,
         });
         calculatedTotalAmount += roomTotal;
       }
+
+      // Store building prices to be added to first booking only
+      buildingAdditionalPrices.push(...roomType.building.additionalPrices);
+    }
+
+    // Process building-level prices once and add to the first booking
+    const seenBuildingPriceIds = new Set<string>();
+    const buildingPricesForFirstRoom: AdditionalPriceInput[] = [];
+    const totalGuestCount = items.reduce((sum, item) => sum + (item.guestCount || item.quantity), 0);
+
+    for (const price of buildingAdditionalPrices) {
+      if (seenBuildingPriceIds.has(price.id)) continue;
+      seenBuildingPriceIds.add(price.id);
+
+      if (price.mandatory || selectedBuildingPriceIds.includes(price.id)) {
+        const titleObj = price.title as Record<string, string>;
+        const title = titleObj?.en || titleObj?.hu || 'Additional fee';
+        const nightMultiplier = price.perNight ? nights : 1;
+        const guestMultiplier = price.perGuest ? totalGuestCount : 1;
+        const quantity = nightMultiplier * guestMultiplier;
+        const total = price.priceEur * quantity;
+
+        buildingPricesForFirstRoom.push({
+          title,
+          priceEur: price.priceEur,
+          quantity,
+        });
+        calculatedTotalAmount += total;
+      }
+    }
+
+    // Add building prices to first booking
+    if (roomBookings.length > 0 && buildingPricesForFirstRoom.length > 0) {
+      roomBookings[0].additionalPrices.push(...buildingPricesForFirstRoom);
+      const buildingTotal = buildingPricesForFirstRoom.reduce((sum, p) => sum + p.priceEur * p.quantity, 0);
+      roomBookings[0].totalAmount += buildingTotal;
     }
 
     // Determine if single or grouped booking

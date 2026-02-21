@@ -326,7 +326,7 @@ export function SearchResultsPage() {
                 <button
                   onClick={handleModifySearch}
                   disabled={!modifyCheckIn || !modifyCheckOut}
-                  className="px-6 py-3 bg-white text-stone-800 rounded-xl font-medium hover:bg-stone-100 transition-colors disabled:bg-stone-400 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-amber-400 text-stone-900 rounded-xl font-semibold hover:bg-amber-300 transition-colors disabled:bg-stone-400 disabled:text-stone-600 disabled:cursor-not-allowed"
                 >
                   {t.search.searchButton}
                 </button>

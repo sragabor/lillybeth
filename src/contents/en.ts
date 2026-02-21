@@ -181,6 +181,8 @@ We believe in providing an exceptional guest experience that begins already in t
     summary: 'Booking Summary',
     additionalServices: 'Additional Services',
     mandatory: 'Required',
+    room: 'Room',
+    perNight: 'night',
     accommodationTotal: 'Accommodation',
     additionalTotal: 'Additional services',
     total: 'Total',
@@ -202,6 +204,8 @@ We believe in providing an exceptional guest experience that begins already in t
     contactUs: 'Contact us if you have any questions',
     questions: 'Have questions?',
     contactSupport: 'Contact our support team',
+    noBookingFound: 'No Booking Found',
+    noBookingDescription: 'We could not find booking details. Please start a new search.',
   },
 };
 

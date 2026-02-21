@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useFrontendLanguage } from '@/contexts/FrontendLanguageContext';
 
@@ -18,11 +18,16 @@ interface BookingDetails {
 
 export function ThankYouPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { t, language } = useFrontendLanguage();
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
+  const [showNoBooking, setShowNoBooking] = useState(false);
+  const hasProcessedParams = useRef(false);
 
   useEffect(() => {
+    // Only process once to avoid redirect loops
+    if (hasProcessedParams.current) return;
+    hasProcessedParams.current = true;
+
     // Parse booking details from URL params
     const id = searchParams.get('id');
     const type = searchParams.get('type') as 'single' | 'group';
@@ -45,10 +50,10 @@ export function ThankYouPage() {
         roomCount: roomCount ? parseInt(roomCount, 10) : 1,
       });
     } else {
-      // No valid booking params, redirect to home
-      router.push('/frontend');
+      // No valid booking params, show message instead of redirecting
+      setShowNoBooking(true);
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -63,6 +68,34 @@ export function ThankYouPage() {
     const end = new Date(checkOut);
     return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   };
+
+  if (showNoBooking) {
+    return (
+      <div className="min-h-screen bg-stone-50 pt-24 pb-16">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-serif font-semibold text-stone-800 mb-3">
+              {t.thankYou?.noBookingFound || 'No Booking Found'}
+            </h2>
+            <p className="text-stone-600 mb-6">
+              {t.thankYou?.noBookingDescription || 'We could not find booking details. Please start a new search.'}
+            </p>
+            <Link
+              href="/frontend/search"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-amber-400 hover:bg-amber-300 text-stone-900 font-semibold rounded-xl transition-colors"
+            >
+              {t.search.searchButton}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!bookingDetails) {
     return (

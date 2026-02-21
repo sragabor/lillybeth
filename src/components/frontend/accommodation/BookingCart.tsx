@@ -139,7 +139,7 @@ export function BookingCart() {
             <button
               onClick={handleBookNow}
               disabled={!hasDates}
-              className="px-6 py-3 bg-white text-stone-800 font-semibold rounded-xl hover:bg-stone-100 transition-colors flex-shrink-0 disabled:bg-stone-600 disabled:text-stone-400 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-amber-400 text-stone-900 font-semibold rounded-xl hover:bg-amber-300 transition-colors flex-shrink-0 disabled:bg-stone-600 disabled:text-stone-400 disabled:cursor-not-allowed"
             >
               {hasDates ? t.header.bookNow : (t.booking?.selectDates || 'Select dates')}
             </button>

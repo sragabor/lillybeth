@@ -113,15 +113,16 @@ export function SearchSection() {
                 disabled={!checkIn || !checkOut}
                 className="
                   w-full lg:w-auto h-[58px] px-8
-                  bg-stone-800 hover:bg-stone-700 active:bg-stone-900
-                  disabled:bg-stone-400 disabled:cursor-not-allowed
-                  text-white font-medium
+                  bg-amber-400 hover:bg-amber-300 active:bg-amber-500
+                  disabled:bg-stone-300 disabled:cursor-not-allowed
+                  text-stone-900 font-semibold
                   rounded-xl
                   transition-all duration-300
                   flex items-center justify-center gap-2
                   shadow-lg hover:shadow-xl
                   hover:-translate-y-0.5 active:translate-y-0
                   disabled:hover:translate-y-0 disabled:hover:shadow-lg
+                  disabled:text-stone-500
                 "
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

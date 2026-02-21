@@ -18,6 +18,13 @@ interface AdditionalPriceOption {
   roomTypeId?: string;
 }
 
+// Per-room selection: roomTypeId -> roomIndex -> priceId[]
+interface PerRoomPriceSelection {
+  [roomTypeId: string]: {
+    [roomIndex: number]: string[];
+  };
+}
+
 interface RoomPriceBreakdown {
   roomTypeId: string;
   roomTypeName: Record<string, string> | string;
@@ -25,6 +32,8 @@ interface RoomPriceBreakdown {
   quantity: number;
   nightlyPrices: { date: string; price: number }[];
   accommodationTotal: number;
+  pricePerRoom: number;
+  roomTypeAdditionalPrices: AdditionalPriceOption[];
   availableAdditionalPrices: AdditionalPriceOption[];
   roomIds: string[];
 }
@@ -46,7 +55,8 @@ export async function POST(request: NextRequest) {
     const checkIn = new Date(data.checkIn);
     const checkOut = new Date(data.checkOut);
     const items: CartItem[] = data.items;
-    const selectedPriceIds: string[] = data.selectedPriceIds || [];
+    const selectedBuildingPriceIds: string[] = data.selectedBuildingPriceIds || [];
+    const perRoomSelections: PerRoomPriceSelection = data.perRoomSelections || {};
 
     if (checkOut <= checkIn) {
       return NextResponse.json({ error: 'Check-out must be after check-in' }, { status: 400 });
@@ -152,7 +162,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const roomAccommodationTotal = nightlyPrices.reduce((sum, n) => sum + n.price, 0) * item.quantity;
+      const pricePerRoom = nightlyPrices.reduce((sum, n) => sum + n.price, 0);
+      const roomAccommodationTotal = pricePerRoom * item.quantity;
       grandAccommodationTotal += roomAccommodationTotal;
 
       // Get room IDs to book
@@ -160,8 +171,9 @@ export async function POST(request: NextRequest) {
 
       // Collect additional prices
       const roomAdditionalPrices: AdditionalPriceOption[] = [];
+      const roomTypeAdditionalPrices: AdditionalPriceOption[] = [];
 
-      // Building-level additional prices
+      // Building-level additional prices (global, shown once)
       for (const price of roomType.building.additionalPrices) {
         if (!seenPriceIds.has(price.id)) {
           seenPriceIds.add(price.id);
@@ -179,7 +191,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Room type-level additional prices
+      // Room type-level additional prices (per-room)
       for (const price of roomType.additionalPrices) {
         const priceOption: AdditionalPriceOption = {
           id: price.id,
@@ -191,6 +203,8 @@ export async function POST(request: NextRequest) {
           origin: 'roomType',
           roomTypeId: item.roomTypeId,
         };
+        roomTypeAdditionalPrices.push(priceOption);
+        // Also add to global list for reference
         allAdditionalPrices.push(priceOption);
         roomAdditionalPrices.push(priceOption);
       }
@@ -202,6 +216,8 @@ export async function POST(request: NextRequest) {
         quantity: item.quantity,
         nightlyPrices,
         accommodationTotal: roomAccommodationTotal,
+        pricePerRoom,
+        roomTypeAdditionalPrices,
         availableAdditionalPrices: roomAdditionalPrices,
         roomIds,
       });
@@ -218,10 +234,15 @@ export async function POST(request: NextRequest) {
       priceEur: number;
       quantity: number;
       total: number;
+      origin: 'building' | 'roomType';
+      roomTypeId?: string;
+      roomIndex?: number;
     }[] = [];
 
-    for (const price of allAdditionalPrices) {
-      if (price.mandatory || selectedPriceIds.includes(price.id)) {
+    // Process building-level prices (apply once globally)
+    const buildingPrices = allAdditionalPrices.filter(p => p.origin === 'building');
+    for (const price of buildingPrices) {
+      if (price.mandatory || selectedBuildingPriceIds.includes(price.id)) {
         const nightMultiplier = price.perNight ? nights : 1;
         const guestMultiplier = price.perGuest ? totalGuestCount : 1;
         const quantity = nightMultiplier * guestMultiplier;
@@ -233,9 +254,47 @@ export async function POST(request: NextRequest) {
           priceEur: price.priceEur,
           quantity,
           total,
+          origin: 'building',
         });
 
         additionalTotal += total;
+      }
+    }
+
+    // Process room-type-level prices (apply per room based on selection)
+    for (const breakdown of roomBreakdowns) {
+      const roomTypeId = breakdown.roomTypeId;
+      const roomTypeSelections = perRoomSelections[roomTypeId] || {};
+      const roomTypePrices = breakdown.roomTypeAdditionalPrices;
+
+      // Get guest count per room for this room type
+      const itemGuestCount = items.find(i => i.roomTypeId === roomTypeId)?.guestCount || breakdown.quantity;
+      const guestsPerRoom = Math.ceil(itemGuestCount / breakdown.quantity);
+
+      for (let roomIndex = 0; roomIndex < breakdown.quantity; roomIndex++) {
+        const roomSelections = roomTypeSelections[roomIndex] || [];
+
+        for (const price of roomTypePrices) {
+          if (price.mandatory || roomSelections.includes(price.id)) {
+            const nightMultiplier = price.perNight ? nights : 1;
+            const guestMultiplier = price.perGuest ? guestsPerRoom : 1;
+            const quantity = nightMultiplier * guestMultiplier;
+            const total = price.priceEur * quantity;
+
+            selectedAdditionalPrices.push({
+              id: price.id,
+              title: price.title,
+              priceEur: price.priceEur,
+              quantity,
+              total,
+              origin: 'roomType',
+              roomTypeId,
+              roomIndex,
+            });
+
+            additionalTotal += total;
+          }
+        }
       }
     }
 

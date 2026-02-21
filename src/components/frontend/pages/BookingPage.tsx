@@ -14,6 +14,14 @@ interface AdditionalPriceOption {
   perNight: boolean;
   perGuest: boolean;
   origin: 'building' | 'roomType';
+  roomTypeId?: string;
+}
+
+// Per-room selection: roomTypeId -> roomIndex -> priceId[]
+interface PerRoomPriceSelection {
+  [roomTypeId: string]: {
+    [roomIndex: number]: string[];
+  };
 }
 
 interface RoomBreakdown {
@@ -22,6 +30,8 @@ interface RoomBreakdown {
   accommodationName: Record<string, string> | string;
   quantity: number;
   accommodationTotal: number;
+  pricePerRoom: number;
+  roomTypeAdditionalPrices: AdditionalPriceOption[];
 }
 
 interface PriceCalculation {
@@ -60,17 +70,23 @@ export function BookingPage() {
     arrivalTime: '',
     notes: '',
   });
-  const [selectedPriceIds, setSelectedPriceIds] = useState<string[]>([]);
+  // Building-level price selections (global)
+  const [selectedBuildingPriceIds, setSelectedBuildingPriceIds] = useState<string[]>([]);
+  // Per-room price selections: roomTypeId -> roomIndex -> priceId[]
+  const [perRoomSelections, setPerRoomSelections] = useState<PerRoomPriceSelection>({});
   const [priceCalculation, setPriceCalculation] = useState<PriceCalculation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recalculating, setRecalculating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState(true);
   const [mandatoryPricesInitialized, setMandatoryPricesInitialized] = useState(false);
 
-  // Use ref to track selectedPriceIds for API calls without causing re-renders
-  const selectedPriceIdsRef = useRef<string[]>([]);
-  selectedPriceIdsRef.current = selectedPriceIds;
+  // Use refs for API calls without causing re-renders
+  const selectedBuildingPriceIdsRef = useRef<string[]>([]);
+  selectedBuildingPriceIdsRef.current = selectedBuildingPriceIds;
+  const perRoomSelectionsRef = useRef<PerRoomPriceSelection>({});
+  perRoomSelectionsRef.current = perRoomSelections;
 
   const getLocalizedText = useCallback(
     (field: Record<string, string> | string | null | undefined): string => {
@@ -108,7 +124,8 @@ export function BookingPage() {
               quantity: item.quantity,
               guestCount: item.capacity * item.quantity,
             })),
-            selectedPriceIds: selectedPriceIdsRef.current,
+            selectedBuildingPriceIds: selectedBuildingPriceIdsRef.current,
+            perRoomSelections: perRoomSelectionsRef.current,
           }),
         });
 
@@ -119,12 +136,31 @@ export function BookingPage() {
 
           // Auto-select mandatory prices only on first load
           if (!mandatoryPricesInitialized) {
-            const mandatoryIds = data.availableAdditionalPrices
-              .filter((p: AdditionalPriceOption) => p.mandatory)
+            // Mandatory building-level prices
+            const mandatoryBuildingIds = data.availableAdditionalPrices
+              .filter((p: AdditionalPriceOption) => p.mandatory && p.origin === 'building')
               .map((p: AdditionalPriceOption) => p.id);
-            if (mandatoryIds.length > 0) {
-              setSelectedPriceIds(mandatoryIds);
+            if (mandatoryBuildingIds.length > 0) {
+              setSelectedBuildingPriceIds(mandatoryBuildingIds);
             }
+
+            // Initialize per-room selections for all rooms
+            // This ensures proper state structure even without mandatory prices
+            const newPerRoomSelections: PerRoomPriceSelection = {};
+            for (const breakdown of data.roomBreakdowns) {
+              const mandatoryRoomPrices = breakdown.roomTypeAdditionalPrices
+                ?.filter((p: AdditionalPriceOption) => p.mandatory)
+                .map((p: AdditionalPriceOption) => p.id) || [];
+
+              // Always initialize the room type structure
+              newPerRoomSelections[breakdown.roomTypeId] = {};
+              for (let i = 0; i < breakdown.quantity; i++) {
+                // Initialize with mandatory prices (or empty array if none)
+                newPerRoomSelections[breakdown.roomTypeId][i] = [...mandatoryRoomPrices];
+              }
+            }
+            setPerRoomSelections(newPerRoomSelections);
+
             setMandatoryPricesInitialized(true);
           }
         } else {
@@ -149,6 +185,7 @@ export function BookingPage() {
     const recalculatePrices = async () => {
       if (!dates.checkIn || !dates.checkOut || items.length === 0) return;
 
+      setRecalculating(true);
       try {
         const response = await fetch('/api/frontend/booking/calculate', {
           method: 'POST',
@@ -161,7 +198,8 @@ export function BookingPage() {
               quantity: item.quantity,
               guestCount: item.capacity * item.quantity,
             })),
-            selectedPriceIds,
+            selectedBuildingPriceIds,
+            perRoomSelections,
           }),
         });
 
@@ -171,23 +209,71 @@ export function BookingPage() {
         }
       } catch (err) {
         console.error('Error recalculating prices:', err);
+      } finally {
+        setRecalculating(false);
       }
     };
 
     recalculatePrices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPriceIds]);
+  }, [selectedBuildingPriceIds, perRoomSelections]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const toggleAdditionalPrice = (priceId: string, mandatory: boolean) => {
+  // Toggle building-level additional price
+  const toggleBuildingPrice = (priceId: string, mandatory: boolean) => {
     if (mandatory) return;
-    setSelectedPriceIds((prev) =>
+    setSelectedBuildingPriceIds((prev) =>
       prev.includes(priceId) ? prev.filter((id) => id !== priceId) : [...prev, priceId]
     );
+  };
+
+  // Toggle per-room additional price
+  const toggleRoomPrice = (roomTypeId: string, roomIndex: number, priceId: string, mandatory: boolean) => {
+    if (mandatory) return;
+    setPerRoomSelections((prev) => {
+      // Deep clone the entire structure to ensure React detects the change
+      const updated: PerRoomPriceSelection = {};
+
+      // Copy all existing data
+      for (const rtId of Object.keys(prev)) {
+        updated[rtId] = {};
+        for (const rIdxStr of Object.keys(prev[rtId])) {
+          const rIdx = Number(rIdxStr);
+          updated[rtId][rIdx] = [...prev[rtId][rIdx]];
+        }
+      }
+
+      // Ensure the target room type exists
+      if (!updated[roomTypeId]) {
+        updated[roomTypeId] = {};
+      }
+
+      // Ensure the target room index exists
+      if (!updated[roomTypeId][roomIndex]) {
+        updated[roomTypeId][roomIndex] = [];
+      }
+
+      // Toggle the price
+      const currentPrices = updated[roomTypeId][roomIndex];
+      if (currentPrices.includes(priceId)) {
+        // Remove the price (deselect)
+        updated[roomTypeId][roomIndex] = currentPrices.filter((id) => id !== priceId);
+      } else {
+        // Add the price (select)
+        updated[roomTypeId][roomIndex] = [...currentPrices, priceId];
+      }
+
+      return updated;
+    });
+  };
+
+  // Check if a room price is selected
+  const isRoomPriceSelected = (roomTypeId: string, roomIndex: number, priceId: string): boolean => {
+    return perRoomSelections[roomTypeId]?.[roomIndex]?.includes(priceId) || false;
   };
 
   const handleRemoveRoom = (roomTypeId: string) => {
@@ -216,7 +302,8 @@ export function BookingPage() {
             quantity: item.quantity,
             guestCount: item.capacity * item.quantity,
           })),
-          selectedPriceIds,
+          selectedBuildingPriceIds,
+          perRoomSelections,
         }),
       });
 
@@ -390,17 +477,17 @@ export function BookingPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full px-6 py-4 bg-stone-800 text-white rounded-xl font-semibold hover:bg-stone-700 transition-colors disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full px-6 py-4 bg-amber-400 text-stone-900 rounded-xl font-semibold hover:bg-amber-300 transition-colors disabled:bg-stone-300 disabled:text-stone-500 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-stone-900/30 border-t-stone-900 rounded-full animate-spin" />
                       <span>{t.booking?.processing || 'Processing...'}</span>
                     </>
                   ) : (
                     <>
                       <span>{t.booking?.completeBooking || 'Complete Booking'}</span>
-                      <span className="text-white/80">• €{priceCalculation.grandTotal}</span>
+                      <span className="text-stone-700">• €{priceCalculation.grandTotal}</span>
                     </>
                   )}
                 </button>
@@ -455,38 +542,129 @@ export function BookingPage() {
                       </div>
                     </div>
 
-                    {/* Rooms */}
-                    <div className="space-y-3 mb-4">
-                      {items.map((item) => (
-                        <div
-                          key={item.roomTypeId}
-                          className="flex items-start justify-between gap-3 p-3 bg-stone-50 rounded-xl"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-stone-800 truncate">{item.roomTypeName}</p>
-                            <p className="text-sm text-stone-500">
-                              {item.accommodationName} • x{item.quantity}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {item.pricePerNight && (
-                              <span className="text-sm font-medium text-stone-700">
-                                €{item.pricePerNight * item.quantity * priceCalculation.nights}
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRoom(item.roomTypeId)}
-                              className="p-1 text-stone-400 hover:text-red-500 transition-colors"
-                              aria-label="Remove room"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
+                    {/* Per-Room Breakdowns with Additional Prices */}
+                    <div className="space-y-4 mb-4 relative">
+                      {/* Recalculating overlay */}
+                      {recalculating && (
+                        <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center rounded-xl">
+                          <div className="w-5 h-5 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
                         </div>
-                      ))}
+                      )}
+                      {priceCalculation.roomBreakdowns.map((breakdown) => {
+                        const roomName = getLocalizedText(breakdown.roomTypeName);
+                        const accName = getLocalizedText(breakdown.accommodationName);
+                        const optionalPrices = breakdown.roomTypeAdditionalPrices?.filter((p) => !p.mandatory) || [];
+                        const mandatoryPrices = breakdown.roomTypeAdditionalPrices?.filter((p) => p.mandatory) || [];
+                        const hasMultipleRooms = breakdown.quantity > 1;
+
+                        return (
+                          <div key={breakdown.roomTypeId} className="bg-stone-50 rounded-xl overflow-hidden">
+                            {/* Room Type Header */}
+                            <div className="flex items-start justify-between gap-3 p-3 border-b border-stone-100">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-stone-800 truncate">{roomName}</p>
+                                <p className="text-sm text-stone-500">{accName}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRoom(breakdown.roomTypeId)}
+                                disabled={recalculating}
+                                className="p-1 text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label="Remove room"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Individual Rooms */}
+                            {Array.from({ length: breakdown.quantity }, (_, roomIndex) => (
+                              <div key={roomIndex} className="p-3 border-b border-stone-100 last:border-b-0">
+                                <div className="flex items-center justify-between mb-2">
+                                  {hasMultipleRooms ? (
+                                    <span className="text-sm font-medium text-stone-700">
+                                      {t.booking?.room || 'Room'} {roomIndex + 1}
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm font-medium text-stone-700">
+                                      {t.booking?.accommodationTotal || 'Accommodation'}
+                                    </span>
+                                  )}
+                                  <span className="text-sm text-stone-600">
+                                    €{breakdown.pricePerRoom || 0}
+                                  </span>
+                                </div>
+
+                                {/* Mandatory room prices */}
+                                {mandatoryPrices.map((price) => (
+                                  <div
+                                    key={price.id}
+                                    className="flex items-center justify-between py-1 text-xs text-stone-500"
+                                  >
+                                    <span className="flex items-center gap-1">
+                                      <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                      {getLocalizedText(price.title)}
+                                      <span className="text-stone-400">({t.booking?.mandatory || 'Required'})</span>
+                                    </span>
+                                    <span>
+                                      €{price.priceEur}
+                                      {price.perNight && `/${t.booking?.perNight || 'night'}`}
+                                    </span>
+                                  </div>
+                                ))}
+
+                                {/* Optional room prices */}
+                                {optionalPrices.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {optionalPrices.map((price) => {
+                                      const isSelected = isRoomPriceSelected(breakdown.roomTypeId, roomIndex, price.id);
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={price.id}
+                                          onClick={() => toggleRoomPrice(breakdown.roomTypeId, roomIndex, price.id, false)}
+                                          disabled={recalculating}
+                                          className={`w-full flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                                            recalculating
+                                              ? 'opacity-50 cursor-not-allowed'
+                                              : 'cursor-pointer'
+                                          } ${
+                                            isSelected
+                                              ? 'bg-amber-50 border-amber-300'
+                                              : 'bg-white border-stone-200 hover:border-stone-300'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <div
+                                              className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                                                isSelected ? 'bg-amber-400 border-amber-400' : 'border-stone-300'
+                                              }`}
+                                            >
+                                              {isSelected && (
+                                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                              )}
+                                            </div>
+                                            <span className="text-xs text-stone-700">{getLocalizedText(price.title)}</span>
+                                          </div>
+                                          <span className="text-xs text-stone-600">
+                                            +€{price.priceEur}
+                                            {price.perNight && `/${t.booking?.perNight || 'night'}`}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Guest count */}
@@ -497,80 +675,90 @@ export function BookingPage() {
                       </span>
                     </div>
 
-                    {/* Additional Prices */}
-                    {priceCalculation.availableAdditionalPrices.length > 0 && (
-                      <div className="mb-4">
+                    {/* Building-level Additional Prices */}
+                    {priceCalculation.availableAdditionalPrices.filter((p) => p.origin === 'building').length > 0 && (
+                      <div className="mb-4 relative">
+                        {/* Recalculating overlay */}
+                        {recalculating && (
+                          <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center rounded-xl">
+                            <div className="w-5 h-5 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                          </div>
+                        )}
                         <p className="text-sm font-medium text-stone-700 mb-3">
                           {t.booking?.additionalServices || 'Additional Services'}
                         </p>
                         <div className="space-y-2">
-                          {priceCalculation.availableAdditionalPrices.map((price) => {
-                            const isSelected = selectedPriceIds.includes(price.id);
-                            const priceLabel = getLocalizedText(price.title);
+                          {priceCalculation.availableAdditionalPrices
+                            .filter((price) => price.origin === 'building')
+                            .map((price) => {
+                              const isSelected = selectedBuildingPriceIds.includes(price.id);
+                              const priceLabel = getLocalizedText(price.title);
 
-                            return (
-                              <label
-                                key={price.id}
-                                className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${
-                                  price.mandatory
-                                    ? 'bg-stone-100 border-stone-200 cursor-default'
-                                    : isSelected
-                                    ? 'bg-stone-800 border-stone-800 text-white'
-                                    : 'bg-white border-stone-200 hover:border-stone-300'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected || price.mandatory}
-                                    onChange={() => toggleAdditionalPrice(price.id, price.mandatory)}
-                                    disabled={price.mandatory}
-                                    className="sr-only"
-                                  />
-                                  <div
-                                    className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                      isSelected || price.mandatory
-                                        ? 'bg-white border-white'
-                                        : 'border-stone-300'
-                                    }`}
-                                  >
-                                    {(isSelected || price.mandatory) && (
-                                      <svg className="w-3 h-3 text-stone-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    )}
+                              return (
+                                <button
+                                  type="button"
+                                  key={price.id}
+                                  onClick={() => toggleBuildingPrice(price.id, price.mandatory)}
+                                  disabled={price.mandatory || recalculating}
+                                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                                    price.mandatory
+                                      ? 'bg-stone-100 border-stone-200 cursor-default'
+                                      : recalculating
+                                      ? 'opacity-50 cursor-not-allowed'
+                                      : isSelected
+                                      ? 'bg-amber-50 border-amber-300 cursor-pointer'
+                                      : 'bg-white border-stone-200 hover:border-stone-300 cursor-pointer'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                        isSelected || price.mandatory
+                                          ? 'bg-amber-400 border-amber-400'
+                                          : 'border-stone-300'
+                                      }`}
+                                    >
+                                      {(isSelected || price.mandatory) && (
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    <div className="text-left">
+                                      <p className="text-sm font-medium text-stone-700">
+                                        {priceLabel}
+                                      </p>
+                                      {price.mandatory && (
+                                        <p className="text-xs text-stone-500">{t.booking?.mandatory || 'Required'}</p>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className={`text-sm font-medium ${price.mandatory || isSelected ? '' : 'text-stone-700'}`}>
-                                      {priceLabel}
-                                    </p>
-                                    {price.mandatory && (
-                                      <p className="text-xs text-stone-500">{t.booking?.mandatory || 'Required'}</p>
-                                    )}
-                                  </div>
-                                </div>
-                                <span className={`text-sm font-medium ${price.mandatory || isSelected ? '' : 'text-stone-600'}`}>
-                                  €{price.priceEur}
-                                  {price.perNight && <span className="text-xs opacity-70">/night</span>}
-                                  {price.perGuest && <span className="text-xs opacity-70">/guest</span>}
-                                </span>
-                              </label>
-                            );
-                          })}
+                                  <span className="text-sm font-medium text-stone-600">
+                                    €{price.priceEur}
+                                    {price.perNight && <span className="text-xs opacity-70">/{t.booking?.perNight || 'night'}</span>}
+                                    {price.perGuest && <span className="text-xs opacity-70">/{t.search.guestSingular}</span>}
+                                  </span>
+                                </button>
+                              );
+                            })}
                         </div>
                       </div>
                     )}
 
                     {/* Price Breakdown */}
-                    <div className="space-y-2 pt-4 border-t border-stone-100">
+                    <div className="space-y-2 pt-4 border-t border-stone-100 relative">
                       <div className="flex justify-between text-sm">
                         <span className="text-stone-500">{t.booking?.accommodationTotal || 'Accommodation'}</span>
-                        <span className="text-stone-700">€{priceCalculation.accommodationTotal}</span>
+                        <span className={`text-stone-700 transition-opacity ${recalculating ? 'opacity-50' : ''}`}>
+                          €{priceCalculation.accommodationTotal}
+                        </span>
                       </div>
                       {priceCalculation.additionalTotal > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-stone-500">{t.booking?.additionalTotal || 'Additional services'}</span>
-                          <span className="text-stone-700">€{priceCalculation.additionalTotal}</span>
+                          <span className={`text-stone-700 transition-opacity ${recalculating ? 'opacity-50' : ''}`}>
+                            €{priceCalculation.additionalTotal}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -578,7 +766,14 @@ export function BookingPage() {
                     {/* Grand Total */}
                     <div className="flex justify-between items-center pt-4 mt-4 border-t border-stone-200">
                       <span className="text-lg font-semibold text-stone-800">{t.booking?.total || 'Total'}</span>
-                      <span className="text-2xl font-bold text-stone-800">€{priceCalculation.grandTotal}</span>
+                      <div className="flex items-center gap-2">
+                        {recalculating && (
+                          <div className="w-4 h-4 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+                        )}
+                        <span className={`text-2xl font-bold text-stone-800 transition-opacity ${recalculating ? 'opacity-50' : ''}`}>
+                          €{priceCalculation.grandTotal}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -591,20 +786,17 @@ export function BookingPage() {
                   form="booking-form"
                   disabled={submitting}
                   onClick={handleSubmit}
-                  className="w-full px-6 py-4 bg-stone-800 text-white rounded-xl font-semibold hover:bg-stone-700 transition-colors disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full px-6 py-4 bg-amber-400 text-stone-900 rounded-xl font-semibold hover:bg-amber-300 transition-colors disabled:bg-stone-300 disabled:text-stone-500 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-stone-900/30 border-t-stone-900 rounded-full animate-spin" />
                       <span>{t.booking?.processing || 'Processing...'}</span>
                     </>
                   ) : (
                     <span>{t.booking?.completeBooking || 'Complete Booking'}</span>
                   )}
                 </button>
-                <p className="text-xs text-center text-stone-500 mt-3">
-                  {t.booking?.secureBooking || 'Your booking is secure and confirmed instantly'}
-                </p>
               </div>
             </div>
           </div>
