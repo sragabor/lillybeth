@@ -135,6 +135,7 @@ export function SearchResultRoomTypeCard({
       quantity: clampedQuantity,
       pricePerNight: roomType.minPrice,
       capacity: roomType.capacity,
+      // guestCounts will be initialized by context with capacity as default
     });
   };
 

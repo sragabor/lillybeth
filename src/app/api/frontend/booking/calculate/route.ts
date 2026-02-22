@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 interface CartItem {
   roomTypeId: string;
   quantity: number;
-  guestCount?: number;
+  guestCounts?: number[]; // Guest count per room (length = quantity)
 }
 
 interface AdditionalPriceOption {
@@ -223,8 +223,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Calculate total guest count
-    const totalGuestCount = items.reduce((sum, item) => sum + (item.guestCount || item.quantity), 0);
+    // Calculate total guest count from per-room guestCounts arrays
+    const totalGuestCount = items.reduce((sum, item) => {
+      const guestCounts = item.guestCounts || Array(item.quantity).fill(item.quantity);
+      return sum + guestCounts.reduce((s, g) => s + g, 0);
+    }, 0);
 
     // Calculate additional prices total
     let additionalTotal = 0;
@@ -267,17 +270,19 @@ export async function POST(request: NextRequest) {
       const roomTypeSelections = perRoomSelections[roomTypeId] || {};
       const roomTypePrices = breakdown.roomTypeAdditionalPrices;
 
-      // Get guest count per room for this room type
-      const itemGuestCount = items.find(i => i.roomTypeId === roomTypeId)?.guestCount || breakdown.quantity;
-      const guestsPerRoom = Math.ceil(itemGuestCount / breakdown.quantity);
+      // Get the per-room guest counts array for this room type
+      const item = items.find(i => i.roomTypeId === roomTypeId);
+      const guestCounts = item?.guestCounts || Array(breakdown.quantity).fill(1);
 
       for (let roomIndex = 0; roomIndex < breakdown.quantity; roomIndex++) {
         const roomSelections = roomTypeSelections[roomIndex] || [];
+        // Get guest count for this specific room (default to 1 if not set)
+        const roomGuestCount = guestCounts[roomIndex] || 1;
 
         for (const price of roomTypePrices) {
           if (price.mandatory || roomSelections.includes(price.id)) {
             const nightMultiplier = price.perNight ? nights : 1;
-            const guestMultiplier = price.perGuest ? guestsPerRoom : 1;
+            const guestMultiplier = price.perGuest ? roomGuestCount : 1;
             const quantity = nightMultiplier * guestMultiplier;
             const total = price.priceEur * quantity;
 

@@ -24,8 +24,14 @@ export function BookingCart() {
     return sum;
   }, 0);
 
-  // Calculate total capacity
+  // Calculate total capacity (max possible)
   const totalCapacity = items.reduce((sum, item) => sum + item.capacity * item.quantity, 0);
+
+  // Calculate actual total guests from guestCounts
+  const totalGuests = items.reduce((sum, item) => {
+    const guestCounts = item.guestCounts || Array(item.quantity).fill(item.capacity);
+    return sum + guestCounts.reduce((s, g) => s + g, 0);
+  }, 0);
 
   // Check if we have dates set
   const hasDates = dates.checkIn && dates.checkOut;
@@ -66,7 +72,10 @@ export function BookingCart() {
                   </div>
                 )}
 
-                {items.map((item) => (
+                {items.map((item) => {
+                  const itemGuestCounts = item.guestCounts || Array(item.quantity).fill(item.capacity);
+                  const itemTotalGuests = itemGuestCounts.reduce((s, g) => s + g, 0);
+                  return (
                   <div
                     key={item.roomTypeId}
                     className="flex items-center justify-between py-3 border-b border-stone-700 last:border-0"
@@ -74,7 +83,7 @@ export function BookingCart() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{item.roomTypeName}</p>
                       <p className="text-sm text-stone-400">
-                        {item.accommodationName} • {item.capacity} {item.capacity === 1 ? 'guest' : 'guests'}
+                        {item.accommodationName} • {itemTotalGuests} {itemTotalGuests === 1 ? 'guest' : 'guests'}
                       </p>
                     </div>
                     <div className="flex items-center gap-4 ml-4">
@@ -97,7 +106,8 @@ export function BookingCart() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -119,7 +129,7 @@ export function BookingCart() {
                   {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} selected
                 </p>
                 <p className="text-sm text-stone-400 truncate">
-                  {totalCapacity} {totalCapacity === 1 ? 'guest' : 'guests'} total
+                  {totalGuests} {totalGuests === 1 ? 'guest' : 'guests'} total
                   {totalPricePerNight > 0 && ` • €${totalPricePerNight}/night`}
                 </p>
               </div>

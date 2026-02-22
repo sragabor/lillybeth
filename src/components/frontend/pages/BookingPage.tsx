@@ -61,7 +61,7 @@ interface FormData {
 export function BookingPage() {
   const router = useRouter();
   const { t, language } = useFrontendLanguage();
-  const { items, dates, totalRooms, removeItem, clearCart } = useBookingCart();
+  const { items, dates, totalRooms, removeItem, clearCart, updateGuestCount } = useBookingCart();
 
   const [formData, setFormData] = useState<FormData>({
     guestName: '',
@@ -122,7 +122,7 @@ export function BookingPage() {
             items: items.map((item) => ({
               roomTypeId: item.roomTypeId,
               quantity: item.quantity,
-              guestCount: item.capacity * item.quantity,
+              guestCounts: item.guestCounts || Array(item.quantity).fill(item.capacity),
             })),
             selectedBuildingPriceIds: selectedBuildingPriceIdsRef.current,
             perRoomSelections: perRoomSelectionsRef.current,
@@ -196,7 +196,7 @@ export function BookingPage() {
             items: items.map((item) => ({
               roomTypeId: item.roomTypeId,
               quantity: item.quantity,
-              guestCount: item.capacity * item.quantity,
+              guestCounts: item.guestCounts || Array(item.quantity).fill(item.capacity),
             })),
             selectedBuildingPriceIds,
             perRoomSelections,
@@ -300,7 +300,7 @@ export function BookingPage() {
           items: items.map((item) => ({
             roomTypeId: item.roomTypeId,
             quantity: item.quantity,
-            guestCount: item.capacity * item.quantity,
+            guestCounts: item.guestCounts || Array(item.quantity).fill(item.capacity),
           })),
           selectedBuildingPriceIds,
           perRoomSelections,
@@ -358,6 +358,10 @@ export function BookingPage() {
   }
 
   const totalCapacity = items.reduce((sum, item) => sum + item.capacity * item.quantity, 0);
+  const totalGuests = items.reduce((sum, item) => {
+    const guestCounts = item.guestCounts || Array(item.quantity).fill(item.capacity);
+    return sum + guestCounts.reduce((s, g) => s + g, 0);
+  }, 0);
 
   return (
     <div className="min-h-screen bg-stone-50 pt-24 pb-16">
@@ -579,7 +583,13 @@ export function BookingPage() {
                             </div>
 
                             {/* Individual Rooms */}
-                            {Array.from({ length: breakdown.quantity }, (_, roomIndex) => (
+                            {Array.from({ length: breakdown.quantity }, (_, roomIndex) => {
+                              // Get the cart item for this room type
+                              const cartItem = items.find((i) => i.roomTypeId === breakdown.roomTypeId);
+                              const currentGuestCount = cartItem?.guestCounts?.[roomIndex] ?? cartItem?.capacity ?? 1;
+                              const maxGuests = cartItem?.capacity ?? 1;
+
+                              return (
                               <div key={roomIndex} className="p-3 border-b border-stone-100 last:border-b-0">
                                 <div className="flex items-center justify-between mb-2">
                                   {hasMultipleRooms ? (
@@ -594,6 +604,51 @@ export function BookingPage() {
                                   <span className="text-sm text-stone-600">
                                     €{breakdown.pricePerRoom || 0}
                                   </span>
+                                </div>
+
+                                {/* Guest Count Stepper */}
+                                <div className="flex items-center justify-between mb-2 p-2 bg-white rounded-lg border border-stone-200">
+                                  <div className="flex items-center gap-2 text-sm text-stone-600">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>{t.search?.guests || 'Guests'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateGuestCount(breakdown.roomTypeId, roomIndex, currentGuestCount - 1)}
+                                      disabled={currentGuestCount <= 1 || recalculating}
+                                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                                        currentGuestCount <= 1 || recalculating
+                                          ? 'bg-stone-100 text-stone-300 cursor-not-allowed'
+                                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                      }`}
+                                      aria-label="Decrease guests"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                      </svg>
+                                    </button>
+                                    <span className="w-6 text-center text-sm font-medium text-stone-700">
+                                      {currentGuestCount}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateGuestCount(breakdown.roomTypeId, roomIndex, currentGuestCount + 1)}
+                                      disabled={currentGuestCount >= maxGuests || recalculating}
+                                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                                        currentGuestCount >= maxGuests || recalculating
+                                          ? 'bg-stone-100 text-stone-300 cursor-not-allowed'
+                                          : 'bg-stone-800 text-white hover:bg-stone-700'
+                                      }`}
+                                      aria-label="Increase guests"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                      </svg>
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {/* Mandatory room prices */}
@@ -661,7 +716,8 @@ export function BookingPage() {
                                   </div>
                                 )}
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         );
                       })}
@@ -669,9 +725,9 @@ export function BookingPage() {
 
                     {/* Guest count */}
                     <div className="flex items-center justify-between text-sm pb-4 mb-4 border-b border-stone-100">
-                      <span className="text-stone-500">{t.search.totalCapacity}</span>
+                      <span className="text-stone-500">{t.search.guests}</span>
                       <span className="font-medium text-stone-700">
-                        {totalCapacity} {totalCapacity === 1 ? t.search.guestSingular : t.search.guestPlural}
+                        {totalGuests} {totalGuests === 1 ? t.search.guestSingular : t.search.guestPlural}
                       </span>
                     </div>
 

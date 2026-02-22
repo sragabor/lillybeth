@@ -1,42 +1,62 @@
-## 9. Calendar booking bar rendering bug for ongoing bookings
+## Guest count per room booking (Frontend + Admin)
 
-Current behavior:
-- In Calendar view, bookings are rendered as rectangles.
-- Rectangle width equals the number of booked nights.
-- If a booking started in the past and is still ongoing today:
-  - The booking bar is rendered with full width (total nights),
-  - But the start date is outside of the visible calendar range.
-  - This causes the booking to appear shifted to the right and visually incorrect.
+Problem:
+Currently, the system only knows the room type capacity (max guests),
+but not how many guests will actually stay in each booked room.
+This causes incorrect pricing for additional prices configured as /guest,
+and missing data about real occupancy.
 
-Example:
-- Booking: Feb 20 – Feb 23 (3 nights)
-- Today: Feb 21
-- Current rendering makes it look like: Feb 21 – Feb 24
-- This is incorrect.
+New requirement:
+For every booked room (single booking and grouped booking),
+we must store and display the actual guest count per room.
 
-Expected behavior:
-- Booking bars must always be rendered based on real start and end dates.
-- If the start date is outside of the current visible calendar range:
-  - The bar must start at the first visible date,
-  - The width must be clipped to only the visible portion.
-- The booking duration must NOT be visually shifted.
-- The bar should represent:
-  max(booking.startDate, visibleRange.start) → min(booking.endDate, visibleRange.end)
+Functional requirements:
 
----
+### 1. Guest count input per room
+- On both Frontend (booking flow) and Admin (create/edit booking, group booking):
+  - Each room booking must have a guest count selector (stepper / counter input).
+  - Default value must be the room type’s max guest capacity.
+  - Min value: 1
+  - Max value: roomType.maxGuests
 
-## 10. Multi-image upload broken for buildings and room types
+### 2. Pricing logic change for /guest additional prices
+- Additional prices configured as:
+  - `/guest` must be calculated based on the selected guest count for that room.
+- This applies to:
+  - Frontend booking summary
+  - Final amount calculation
+  - Admin booking price calculation
+  - Group booking calculation
 
-Current behavior:
-- When selecting multiple images for upload (building or room type),
-  only one image is uploaded.
+### 3. Data model changes
+- Store guestCount per room booking:
+  - Single booking → guestCount on booking room entry
+  - Group booking → guestCount per room inside the group
+- Backend payload must include guestCount for each booked room.
+- Backend must persist this value.
 
-Expected behavior:
-- Multi-image selection must upload ALL selected images.
-- The upload process must:
-  - Preserve selection order
-  - Show upload progress per image (if already supported)
-  - Append images to existing gallery, not overwrite
-- This must work for:
-  - Building image upload
-  - Room type image upload
+### 4. UI display
+- Everywhere a room booking is shown (Frontend + Admin):
+  - Display: "Guests in room: X"
+- In Admin:
+  - Calendar view
+  - Booking list
+  - Booking detail
+  - Group booking detail
+- In Frontend:
+  - Booking summary
+  - Thank you page
+  - (Later: booking confirmation email)
+
+### 5. Editing behavior
+- Guest count must be editable:
+  - On Frontend before final booking
+  - In Admin when editing booking / group booking
+- Changing guest count must immediately recalculate:
+  - /guest additional prices
+  - Final total amount
+
+### 6. Validation
+- guestCount cannot exceed roomType.maxGuests
+- guestCount must be >= 1
+- If backend receives invalid guestCount → return validation error

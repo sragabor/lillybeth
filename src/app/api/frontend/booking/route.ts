@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 interface CartItem {
   roomTypeId: string;
   quantity: number;
-  guestCount?: number;
+  guestCounts?: number[]; // Guest count per room (length = quantity)
 }
 
 interface AdditionalPriceInput {
@@ -146,8 +146,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const totalGuestCount = item.guestCount || (roomType.capacity * item.quantity);
-      const guestsPerRoom = Math.ceil(totalGuestCount / item.quantity);
+      // Get the per-room guest counts array (default to capacity for each room)
+      const guestCounts = item.guestCounts || Array(item.quantity).fill(roomType.capacity);
       const roomTypeSelections = perRoomSelections[item.roomTypeId] || {};
 
       // Create bookings for each room with per-room additional prices
@@ -156,13 +156,16 @@ export async function POST(request: NextRequest) {
         const roomSelections = roomTypeSelections[roomIndex] || [];
         const roomAdditionalPrices: AdditionalPriceInput[] = [];
 
+        // Get guest count for this specific room (with validation)
+        const roomGuestCount = Math.max(1, Math.min(guestCounts[roomIndex] || roomType.capacity, roomType.capacity));
+
         // Room type-level additional prices (per room selection)
         for (const price of roomType.additionalPrices) {
           if (price.mandatory || roomSelections.includes(price.id)) {
             const titleObj = price.title as Record<string, string>;
             const title = titleObj?.en || titleObj?.hu || 'Additional fee';
             const nightMultiplier = price.perNight ? nights : 1;
-            const guestMultiplier = price.perGuest ? guestsPerRoom : 1;
+            const guestMultiplier = price.perGuest ? roomGuestCount : 1;
             const quantity = nightMultiplier * guestMultiplier;
 
             roomAdditionalPrices.push({
@@ -179,7 +182,7 @@ export async function POST(request: NextRequest) {
 
         roomBookings.push({
           roomId: room.id,
-          guestCount: guestsPerRoom,
+          guestCount: roomGuestCount,
           totalAmount: roomTotal,
           additionalPrices: roomAdditionalPrices,
         });
@@ -193,7 +196,10 @@ export async function POST(request: NextRequest) {
     // Process building-level prices once and add to the first booking
     const seenBuildingPriceIds = new Set<string>();
     const buildingPricesForFirstRoom: AdditionalPriceInput[] = [];
-    const totalGuestCount = items.reduce((sum, item) => sum + (item.guestCount || item.quantity), 0);
+    const totalGuestCount = items.reduce((sum, item) => {
+      const guestCounts = item.guestCounts || Array(item.quantity).fill(item.quantity);
+      return sum + guestCounts.reduce((s, g) => s + g, 0);
+    }, 0);
 
     for (const price of buildingAdditionalPrices) {
       if (seenBuildingPriceIds.has(price.id)) continue;
