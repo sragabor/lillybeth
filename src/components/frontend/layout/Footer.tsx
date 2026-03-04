@@ -20,13 +20,13 @@ export function Footer() {
           <div>
             <Link href="/frontend" className="inline-flex items-center gap-3 group">
               <Image
-                src="/lillybeth-ico.webp"
+                src="/lillybeth-logo.png"
                 alt="Lillybeth"
                 width={44}
                 height={44}
                 className="rounded-lg transition-transform duration-300 group-hover:scale-105"
               />
-              <span className="font-serif text-2xl text-white">
+              <span className="font-birthstone text-2xl text-white">
                 Lillybeth<sup>®</sup>
               </span>
             </Link>

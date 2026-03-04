@@ -135,7 +135,7 @@ export function AccommodationDetailPage({ slug, routeLanguage }: AccommodationDe
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <h1 className="text-3xl font-serif text-stone-800 mb-4">
+          <h1 className="text-3xl font-birthstone text-stone-800 mb-4">
             {t.accommodation.title} {t.common.error.toLowerCase()}
           </h1>
           <p className="text-stone-600 mb-8">
@@ -156,7 +156,7 @@ export function AccommodationDetailPage({ slug, routeLanguage }: AccommodationDe
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <h1 className="text-3xl font-serif text-stone-800 mb-4">{t.common.error}</h1>
+          <h1 className="text-3xl font-birthstone text-stone-800 mb-4">{t.common.error}</h1>
           <p className="text-stone-600 mb-8">
             Something went wrong while loading this page.
           </p>

@@ -26,7 +26,10 @@
       "Bash(npm run db:migrate:*)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_q3RXJBS0OKkH@ep-sparkling-cherry-ahrvpz0r-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx prisma migrate dev:*)",
       "Bash(pkill:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(xargs sed:*)",
+      "Bash(convert:*)",
+      "Bash(magick:*)"
     ]
   }
 }

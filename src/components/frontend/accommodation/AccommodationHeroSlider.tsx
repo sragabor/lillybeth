@@ -133,7 +133,7 @@ export function AccommodationHeroSlider({
     return (
       <section className="relative h-[70vh] min-h-[500px] bg-stone-200 flex items-center justify-center">
         <div className="text-center px-4">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-stone-600 mb-4">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-birthstone font-bold text-stone-600 mb-4">
             {title}
           </h1>
         </div>
@@ -183,7 +183,7 @@ export function AccommodationHeroSlider({
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center px-4 max-w-4xl">
           {/* Title with fade animation */}
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white drop-shadow-lg mb-6 animate-fade-in-up">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-birthstone font-bold text-white drop-shadow-lg mb-6 animate-fade-in-up">
             {title}
           </h1>
 

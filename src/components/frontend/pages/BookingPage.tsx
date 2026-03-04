@@ -331,6 +331,14 @@ export function BookingPage() {
 
       if (response.ok) {
         const bookingId = data.bookingId || data.bookingGroupId;
+        const totalGuests = items.reduce((sum, item) => {
+          const gc = item.guestCounts || Array(item.quantity).fill(item.capacity);
+          return sum + gc.reduce((s: number, g: number) => s + g, 0);
+        }, 0);
+        const allGuestCounts = items.flatMap((item) =>
+          item.guestCounts || Array(item.quantity).fill(item.capacity)
+        );
+
         const params = new URLSearchParams({
           id: bookingId,
           type: data.type,
@@ -340,6 +348,8 @@ export function BookingPage() {
           checkOut: dates.checkOut!,
           total: data.totalAmount.toString(),
           rooms: totalRooms.toString(),
+          guests: totalGuests.toString(),
+          guestCounts: allGuestCounts.join(','),
         });
 
         redirectingToThankYou.current = true;
@@ -400,7 +410,7 @@ export function BookingPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <h1 className="text-2xl font-serif font-semibold text-stone-800">
+          <h1 className="text-2xl font-birthstone font-semibold text-stone-800">
             {t.booking?.title || 'Complete Your Booking'}
           </h1>
         </div>

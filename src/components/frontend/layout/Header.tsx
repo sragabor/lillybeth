@@ -58,13 +58,13 @@ export function Header() {
               className="flex items-center gap-3 transition-transform duration-300 hover:scale-105"
             >
               <Image
-                src="/lillybeth-ico.webp"
+                src="/lillybeth-logo.png"
                 alt="Lillybeth®"
                 width={40}
                 height={40}
                 className="rounded-lg"
               />
-              <span className="font-serif text-2xl tracking-wide text-white">
+              <span className="font-birthstone text-2xl tracking-wide text-white">
                 Lillybeth<sup>®</sup>
               </span>
             </Link>
@@ -161,13 +161,13 @@ export function Header() {
             <div className="flex items-center justify-between p-4 border-b border-stone-100">
               <div className="flex items-center gap-2">
                 <Image
-                  src="/lillybeth-ico.webp"
+                  src="/lillybeth-logo.png"
                   alt="Lillybeth®"
                   width={32}
                   height={32}
                   className="rounded-lg"
                 />
-                <span className="font-serif text-xl text-stone-800">
+                <span className="font-birthstone text-xl text-stone-800">
                   Lillybeth<sup>®</sup>
                 </span>
               </div>

@@ -39,7 +39,7 @@ export function SearchSection() {
           "
         >
           {/* Section Title */}
-          <h2 className="text-center font-serif text-2xl sm:text-3xl text-stone-800 mb-8">
+          <h2 className="text-center font-birthstone text-2xl sm:text-3xl text-stone-800 mb-8">
             {t.search.title}
           </h2>
 

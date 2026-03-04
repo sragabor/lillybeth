@@ -111,7 +111,7 @@ function renderMarkdown(md: string): React.ReactNode[] {
     if (line.startsWith('## ')) {
       flushList();
       nodes.push(
-        <h2 key={key++} className="font-serif text-3xl text-stone-800 mt-10 mb-3">
+        <h2 key={key++} className="font-birthstone text-3xl text-stone-800 mt-10 mb-3">
           {line.slice(3)}
         </h2>
       );
@@ -120,7 +120,7 @@ function renderMarkdown(md: string): React.ReactNode[] {
     if (line.startsWith('# ')) {
       flushList();
       nodes.push(
-        <h1 key={key++} className="font-serif text-4xl text-stone-800 mb-4">
+        <h1 key={key++} className="font-birthstone text-4xl text-stone-800 mb-4">
           {line.slice(2)}
         </h1>
       );
@@ -219,7 +219,7 @@ export function AboutPage() {
     <div className="bg-white">
       {/* Hero */}
       <div className="bg-stone-900 py-20 px-4 text-center">
-        <h1 className="font-serif text-5xl text-white mb-4">{t.aboutPage.title}</h1>
+        <h1 className="font-birthstone text-5xl text-white mb-4">{t.aboutPage.title}</h1>
         <p className="text-stone-400 text-lg max-w-xl mx-auto">{t.hero.subtitle}</p>
       </div>
 
@@ -241,7 +241,7 @@ export function AboutPage() {
       {/* Contact Section */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-stone-50">
         <div className="max-w-4xl mx-auto">
-          <h2 className="font-serif text-3xl text-stone-800 text-center mb-10">{t.aboutPage.contactTitle}</h2>
+          <h2 className="font-birthstone text-3xl text-stone-800 text-center mb-10">{t.aboutPage.contactTitle}</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Phone */}
@@ -334,7 +334,7 @@ export function AboutPage() {
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10">
-            <h2 className="font-serif text-3xl text-stone-800 mb-2">{t.aboutPage.mapTitle}</h2>
+            <h2 className="font-birthstone text-3xl text-stone-800 mb-2">{t.aboutPage.mapTitle}</h2>
             <p className="text-stone-500">{t.aboutPage.mapSubtitle}</p>
           </div>
 
@@ -365,7 +365,7 @@ export function AboutPage() {
 
             {/* Building list */}
             <div className="space-y-3">
-              <h3 className="font-serif text-xl text-stone-800 mb-4">{t.aboutPage.buildingsTitle}</h3>
+              <h3 className="font-birthstone text-xl text-stone-800 mb-4">{t.aboutPage.buildingsTitle}</h3>
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                 {buildings.map((building) => {
                   const isSelected = building.id === selectedBuildingId;
@@ -455,7 +455,7 @@ export function AboutPage() {
       {buildings.length > 0 && (
         <section className="py-16 px-4 sm:px-6 lg:px-8 bg-stone-50">
           <div className="max-w-7xl mx-auto">
-            <h2 className="font-serif text-3xl text-stone-800 text-center mb-10">{t.aboutPage.buildingsTitle}</h2>
+            <h2 className="font-birthstone text-3xl text-stone-800 text-center mb-10">{t.aboutPage.buildingsTitle}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {buildings.map((building, index) => {
                 const name = getLocalizedText(building.name);
@@ -493,7 +493,7 @@ export function AboutPage() {
                       </div>
                     </div>
                     <div className="p-6">
-                      <h3 className="font-serif text-xl text-stone-800 group-hover:text-stone-600 transition-colors duration-300">
+                      <h3 className="font-birthstone text-xl text-stone-800 group-hover:text-stone-600 transition-colors duration-300">
                         {name}
                       </h3>
                       {building.address && (

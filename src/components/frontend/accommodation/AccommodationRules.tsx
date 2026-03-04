@@ -45,7 +45,7 @@ export function AccommodationRules({
           {/* House Rules */}
           {hasRules && (
             <div className="bg-white rounded-2xl p-8 shadow-sm">
-              <h3 className="text-xl font-serif font-semibold text-stone-800 mb-6 flex items-center gap-3">
+              <h3 className="text-xl font-birthstone font-semibold text-stone-800 mb-6 flex items-center gap-3">
                 <svg
                   className="w-6 h-6 text-stone-600"
                   fill="none"
@@ -90,7 +90,7 @@ export function AccommodationRules({
           {/* Booking Conditions */}
           {hasConditions && (
             <div className="bg-white rounded-2xl p-8 shadow-sm">
-              <h3 className="text-xl font-serif font-semibold text-stone-800 mb-6 flex items-center gap-3">
+              <h3 className="text-xl font-birthstone font-semibold text-stone-800 mb-6 flex items-center gap-3">
                 <svg
                   className="w-6 h-6 text-stone-600"
                   fill="none"

@@ -87,7 +87,7 @@ export function BookingCart() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{item.roomTypeName}</p>
                         <p className="text-sm text-stone-400">
-                          {item.accommodationName} • {itemTotalGuests} {itemTotalGuests === 1 ? t.search.guestSingular : t.search.guestPlural}
+                          {item.accommodationName} • {t.common.max} {itemTotalGuests} {itemTotalGuests === 1 ? t.search.guestSingular : t.search.guestPlural}
                         </p>
                       </div>
                       <div className="flex items-center gap-4 ml-4">

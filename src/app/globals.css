@@ -2,6 +2,7 @@
 
 @theme {
   --font-family-serif: var(--font-birthstone), cursive;
+  --font-family-birthstone: var(--font-birthstone), cursive;
 }
 
 html {

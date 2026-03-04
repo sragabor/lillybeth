@@ -442,7 +442,7 @@ export function SearchResultsPage() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-serif font-semibold text-stone-800 truncate">
+                    <h2 className="text-xl font-birthstone font-semibold text-stone-800 truncate">
                       {getLocalizedText(accommodation.name)}
                     </h2>
                     {accommodation.address && (

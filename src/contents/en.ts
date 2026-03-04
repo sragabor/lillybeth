@@ -226,6 +226,7 @@ We believe in providing an exceptional guest experience that begins already in t
     contactSupport: 'Contact our support team',
     noBookingFound: 'No Booking Found',
     noBookingDescription: 'We could not find booking details. Please start a new search.',
+    whatsApp: 'WhatsApp',
   },
 };
 

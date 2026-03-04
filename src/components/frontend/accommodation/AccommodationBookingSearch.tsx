@@ -36,7 +36,7 @@ export function AccommodationBookingSearch({
     <section id="booking-search" className="relative -mt-20 z-10 px-4">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 border border-stone-100">
-          <h2 className="text-xl font-serif font-semibold text-stone-800 mb-6 text-center">
+          <h2 className="text-xl font-birthstone font-semibold text-stone-800 mb-6 text-center">
             {t.accommodation.checkAvailability}
           </h2>
 

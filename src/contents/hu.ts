@@ -226,5 +226,6 @@ Hiszünk abban, hogy a kivételes vendégélmény már a tervezésnél elkezdőd
     contactSupport: 'Lépjen kapcsolatba ügyfélszolgálatunkkal',
     noBookingFound: 'Foglalás nem található',
     noBookingDescription: 'Nem találtuk a foglalás adatait. Kérjük, indítson új keresést.',
+    whatsApp: 'WhatsApp',
   },
 };

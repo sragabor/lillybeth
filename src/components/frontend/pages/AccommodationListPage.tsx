@@ -72,7 +72,7 @@ export function AccommodationListPage({ routeLanguage }: AccommodationListPagePr
       {/* Hero Section */}
       <section className="py-16 md:py-24 px-4 bg-stone-50">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-stone-800 mb-6">
+          <h1 className="text-4xl md:text-5xl font-birthstone font-bold text-stone-800 mb-6">
             {t.accommodation.titlePlural}
           </h1>
           <p className="text-lg text-stone-600 max-w-2xl mx-auto">

@@ -178,7 +178,7 @@ export function BuildingCardSlider({
               className="flex flex-col items-center gap-4 text-white px-8 py-6 group/cta"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="text-2xl font-serif">{name}</span>
+              <span className="text-2xl font-birthstone">{name}</span>
               <span className="px-6 py-3 bg-white text-stone-800 rounded-full font-medium text-sm transition-all duration-300 group-hover/cta:bg-stone-100 group-hover/cta:scale-105">
                 {t.buildings.learnMore}
               </span>
@@ -260,7 +260,7 @@ export function BuildingCardSlider({
       {/* Content */}
       <div className="p-5">
         <Link href={`/frontend/${t.routes.accommodation}/${slug}`}>
-          <h3 className="font-serif text-xl text-stone-800 group-hover:text-stone-600 transition-colors duration-300">
+          <h3 className="font-birthstone text-xl text-stone-800 group-hover:text-stone-600 transition-colors duration-300">
             {name}
           </h3>
         </Link>

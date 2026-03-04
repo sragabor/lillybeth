@@ -226,5 +226,6 @@ Wir glauben daran, ein außergewöhnliches Gästeerlebnis zu bieten, das bereits
     contactSupport: 'Kontaktieren Sie unser Support-Team',
     noBookingFound: 'Keine Buchung gefunden',
     noBookingDescription: 'Wir konnten keine Buchungsdaten finden. Bitte starten Sie eine neue Suche.',
+    whatsApp: 'WhatsApp',
   },
 };
