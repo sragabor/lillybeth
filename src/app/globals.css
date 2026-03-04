@@ -1,9 +1,5 @@
 @import "tailwindcss";
 
-@theme {
-  --font-family-serif: var(--font-birthstone), cursive;
-  --font-family-birthstone: var(--font-birthstone), cursive;
-}
 
 html {
   -webkit-font-smoothing: antialiased;
@@ -11,8 +7,13 @@ html {
   scroll-behavior: smooth;
 }
 
+@theme {
+  --font-inter: "Inter", sans-serif;
+  --font-birthstone: "Birthstone", cursive;
+}
+
 body {
-  @apply bg-white font-[family-name:var(--font-inter)];
+  @apply bg-white font-inter;
 }
 
 @layer utilities {

@@ -410,7 +410,7 @@ export function BookingPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <h1 className="text-2xl font-birthstone font-semibold text-stone-800">
+          <h1 className="text-2xl font-serif font-semibold text-stone-800">
             {t.booking?.title || 'Complete Your Booking'}
           </h1>
         </div>

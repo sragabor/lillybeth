@@ -87,7 +87,7 @@ export function ThankYouPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h2 className="text-xl font-birthstone font-semibold text-stone-800 mb-3">
+            <h2 className="text-xl font-serif font-semibold text-stone-800 mb-3">
               {t.thankYou?.noBookingFound || 'No Booking Found'}
             </h2>
             <p className="text-stone-600 mb-6">
@@ -129,7 +129,7 @@ export function ThankYouPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl md:text-3xl font-birthstone font-semibold text-white mb-2">
+            <h1 className="text-2xl md:text-3xl font-serif font-semibold text-white mb-2">
               {t.booking?.confirmationTitle || 'Booking Confirmed!'}
             </h1>
             <p className="text-white/90 text-sm md:text-base">

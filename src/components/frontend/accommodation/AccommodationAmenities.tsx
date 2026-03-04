@@ -107,7 +107,7 @@ export function AccommodationAmenities({
             ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}
           `}
         >
-          <h2 className="text-2xl md:text-3xl font-birthstone font-semibold text-stone-800 mb-8 text-center">
+          <h2 className="text-2xl md:text-3xl font-serif font-semibold text-stone-800 mb-8 text-center">
             {t.accommodation.amenities}
           </h2>
 

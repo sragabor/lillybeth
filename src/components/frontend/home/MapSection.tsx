@@ -121,7 +121,7 @@ export function MapSection() {
 
           {/* Location Info - All Accommodations */}
           <div className="space-y-4">
-            <h3 className="font-birthstone text-xl text-stone-800 mb-4">
+            <h3 className="font-serif text-xl text-stone-800 mb-4">
               {t.accommodation?.titlePlural || 'Our Locations'}
             </h3>
 

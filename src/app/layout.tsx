@@ -14,6 +14,7 @@ const inter = Inter({
   variable: '--font-inter',
 })
 
+
 export const metadata: Metadata = {
   title: 'Lillybeth® Guesthouses | Villa Lillybeth & Garden Rooms & Lakeside',
   description:

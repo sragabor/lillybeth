@@ -103,7 +103,7 @@ export function BuildingCard({
       <div className="p-6">
         <h3
           className="
-            font-birthstone text-xl text-stone-800
+            font-serif text-xl text-stone-800
             group-hover:text-stone-600
             transition-colors duration-300
           "

@@ -167,7 +167,7 @@ export function Header() {
                   height={32}
                   className="rounded-lg"
                 />
-                <span className="font-birthstone text-xl text-stone-800">
+                <span className="font-serif text-xl text-stone-800">
                   Lillybeth<sup>®</sup>
                 </span>
               </div>

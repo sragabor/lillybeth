@@ -34,7 +34,7 @@ export function SectionTitle({
         ${className}
       `}
     >
-      <h2 className="font-birthstone text-3xl sm:text-4xl lg:text-5xl text-stone-800 mb-4">
+      <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-stone-800 mb-4">
         {title}
       </h2>
       {subtitle && (

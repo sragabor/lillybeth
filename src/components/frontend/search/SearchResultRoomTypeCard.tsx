@@ -255,7 +255,7 @@ export function SearchResultRoomTypeCard({
         {/* Content */}
         <div className="flex-1 p-6 lg:p-8 flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-3">
-            <h3 className="text-xl lg:text-2xl font-birthstone font-semibold text-stone-800">
+            <h3 className="text-xl lg:text-2xl font-serif font-semibold text-stone-800">
               {name}
             </h3>
             {/* Prominent capacity badge */}

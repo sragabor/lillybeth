@@ -32,7 +32,7 @@ export function AccommodationLocation({
             ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}
           `}
         >
-          <h2 className="text-2xl md:text-3xl font-birthstone font-semibold text-stone-800 mb-4 text-center">
+          <h2 className="text-2xl md:text-3xl font-serif font-semibold text-stone-800 mb-4 text-center">
             {t.accommodation.location}
           </h2>
           <p className="text-stone-600 text-center mb-8 max-w-2xl mx-auto">
