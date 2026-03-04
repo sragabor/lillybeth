@@ -1,7 +1,33 @@
-'use client';
-
+import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { BookingPage } from '@/components/frontend/pages/BookingPage';
+import { siteConfig } from '@/config';
+import { seoConfig } from '@/config/seo';
+
+const { siteUrl } = siteConfig;
+
+export const metadata: Metadata = {
+  title: seoConfig.booking.en.title,
+  description: seoConfig.booking.en.description,
+  keywords: seoConfig.booking.en.keywords,
+  robots: { index: true, follow: true },
+  alternates: {
+    canonical: `${siteUrl}/frontend/booking`,
+  },
+  openGraph: {
+    title: seoConfig.booking.en.title,
+    description: seoConfig.booking.en.description,
+    url: `${siteUrl}/frontend/booking`,
+    type: 'website',
+    images: [{ url: `${siteUrl}/lillybeth-logo.png`, width: 400, height: 400 }],
+  },
+  twitter: {
+    card: 'summary',
+    title: seoConfig.booking.en.title,
+    description: seoConfig.booking.en.description,
+    images: [`${siteUrl}/lillybeth-logo.png`],
+  },
+};
 
 function BookingPageLoading() {
   return (

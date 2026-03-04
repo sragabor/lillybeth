@@ -1,56 +1,167 @@
-## 16. Thank You Page, Font Fix, Max Guests, New Logo
+## 17. Full SEO implementation (Multilingual – EN / HU / DE)
 
-### 16.1 Thank You page – "What's Next?" section removal
-
-- Remove the entire "What's Next?" section.
-- Instead, add a new section:
-  - Title: "Kérdése van?" / "Have questions?" / "Haben Sie Fragen?"
-  - Display contact methods:
-    - Email
-    - Phone
-    - WhatsApp
-- Remove "Contact our support team" link at bottom.
+Goal:
+Achieve strong SEO performance across all pages and all languages.
 
 ---
 
-### 16.2 Thank You page – Show number of guests
+### 17.1 Dynamic Meta Tags (All Pages)
 
-- Clearly show how many guests the booking is for.
-- Show this per room and as a total if it's a group booking.
-- Label must include localized "max" prefix (e.g., "max 4 fő")
+Every page must include:
 
----
+- <title> (dynamic, localized)
+- <meta name="description">
+- <meta name="keywords">
+- <link rel="canonical">
+- <meta name="robots" content="index,follow">
 
-### 16.3 Fix font rendering (Birthstone)
+Must be localized per language (EN / HU / DE).
 
-- `font-serif` class still renders incorrect fonts.
-- Replace all uses of `font-serif` with a new `font-birthstone` class.
-- Ensure Google font **Birthstone** is imported and applied correctly.
+Dynamic pages:
+- Homepage
+- Accommodation list
+- Accommodation detail
+- Room types
+- Search results
+- Booking page
+- About page
+- Thank you page (noindex)
+- Static pages
 
----
-
-### 16.4 Add "max" prefix for guests in Best Match section
-
-- In the Best Match section, for each room, prefix the guest number with localized "max".
-  - Examples:
-    - EN: max 3 guests
-    - HU: max 3 fő
-    - DE: max 3 Gäste
-
----
-
-### 16.5 Add "max" prefix in booking cart rooms
-
-- In the booking cart, for each room shown:
-  - Guest number label must include localized "max" prefix.
+Rules:
+- No duplicate titles.
+- No duplicate descriptions.
+- Titles 50–60 chars ideal.
+- Descriptions 140–160 chars ideal.
 
 ---
 
-### 16.6 New logo
+### 17.2 hreflang implementation
 
-- New logo file is located at: `/lillybeth-logo.jpeg`
-- If possible:
-  - Convert it to a transparent `.png` version.
-  - Replace current logo site-wide.
-- If transparent version can't be made:
-  - Use `/lillybeth-logo.jpeg` directly, despite black background.
+Add proper hreflang tags:
+
+- rel="alternate" hreflang="en"
+- rel="alternate" hreflang="hu"
+- rel="alternate" hreflang="de"
+- rel="alternate" hreflang="x-default"
+
+Must point to correct language versions of the same page.
+
+---
+
+### 17.3 OpenGraph + Social Preview
+
+Add:
+
+- og:title
+- og:description
+- og:image
+- og:url
+- og:type
+
+Add Twitter Card:
+
+- twitter:card
+- twitter:title
+- twitter:description
+- twitter:image
+
+Use:
+- Accommodation main image
+- Default fallback image
+
+Localized per language.
+
+---
+
+### 17.4 Structured Data (JSON-LD)
+
+Implement structured data:
+
+Homepage:
+- Organization
+- LodgingBusiness
+
+Accommodation detail:
+- LodgingBusiness
+- Hotel
+- PostalAddress
+- GeoCoordinates
+- ImageObject
+- AggregateRating (if exists)
+
+Room type pages:
+- Offer
+- PriceSpecification
+
+About page:
+- Organization
+
+Booking confirmation:
+- Reservation structured data
+
+Use JSON-LD format.
+
+---
+
+### 17.5 Sitemap.xml
+
+Generate dynamic sitemap including:
+- All language versions
+- All accommodation pages
+- About page
+- Static pages
+
+Auto-update when new accommodation is added.
+
+---
+
+### 17.6 Robots.txt
+
+Add:
+- Sitemap reference
+- Disallow:
+  - /admin
+  - booking thank you page
+  - internal search results (if needed)
+
+---
+
+### 17.7 Performance SEO
+
+Ensure:
+- Lazy loading images
+- Proper image sizes
+- Use next-gen formats if possible
+- Avoid blocking scripts
+- Optimize font loading
+
+---
+
+### 17.8 URL structure
+
+Ensure clean URLs:
+
+/en/
+/hu/
+/de/
+
+/en/accommodation/lillybeth-house
+/hu/szallas/lillybeth-haz
+/de/unterkunft/lillybeth-haus
+
+Avoid query-based SEO URLs.
+
+---
+
+### 17.9 Booking Thank You page
+
+Must include:
+<meta name="robots" content="noindex, nofollow">
+
+---
+
+### 17.10 Search result page
+
+Must include:
+<meta name="robots" content="noindex, follow">

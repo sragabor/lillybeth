@@ -11,6 +11,7 @@ export const siteConfig = {
    */
   name: 'Lillybeth',
   tagline: 'Boutique Accommodations',
+  siteUrl: 'https://lillybeth.hu',
 
   /**
    * Contact information

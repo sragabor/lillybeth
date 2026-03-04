@@ -1,7 +1,19 @@
-'use client';
-
+import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { SearchResultsPage } from '@/components/frontend/pages/SearchResultsPage';
+import { siteConfig } from '@/config';
+import { seoConfig } from '@/config/seo';
+
+const { siteUrl } = siteConfig;
+
+export const metadata: Metadata = {
+  title: seoConfig.search.en.title,
+  description: seoConfig.search.en.description,
+  robots: { index: false, follow: true },
+  alternates: {
+    canonical: `${siteUrl}/frontend/search`,
+  },
+};
 
 function SearchPageContent() {
   return <SearchResultsPage />;

@@ -16,9 +16,13 @@ const inter = Inter({
 
 
 export const metadata: Metadata = {
-  title: 'Lillybeth® Guesthouses | Villa Lillybeth & Garden Rooms & Lakeside',
+  title: {
+    default: 'Lillybeth® Guesthouses | Lake Balaton',
+    template: '%s | Lillybeth®',
+  },
   description:
-    'Premium guesthouse accommodation at Lake Balaton. Book directly for the best prices. Villa Lillybeth®, Lillybeth® Garden Rooms & Lillybeth® Lakeside.'
+    'Book your stay at Lillybeth® Guesthouses on Lake Balaton. Cozy rooms, stunning views, and authentic Hungarian hospitality. Best price guaranteed.',
+  metadataBase: new URL('https://lillybeth.hu'),
 }
 
 export default function RootLayout({
