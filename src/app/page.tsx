@@ -13,7 +13,7 @@ const content = {
     bookingInfo:
       'Foglaljon közvetlenül nálunk, garantáltan a legjobb áron, rejtett költségek nélkül – közvetlen kapcsolatban a szállásadóval.',
     contactIntro: 'Addig is örömmel segítünk személyesen az alábbi elérhetőségeken:',
-    tagline: 'Lillybeth Vendégházak – ahol a pihenés már a tervezésnél elkezdődik.',
+    tagline: 'Lillybeth – Minőség és kényelem Keszthely szívében – a Balatontól csupán pár lépésre.',
     contact: 'Kapcsolat',
     comingSoon: 'Hamarosan'
   },
@@ -27,7 +27,7 @@ const content = {
       'Book directly with us and enjoy the guaranteed best price, with no hidden fees and direct contact with the accommodation provider.',
     contactIntro:
       'Until then, we are happy to assist you personally via the following contact details:',
-    tagline: 'Lillybeth Guesthouses – where relaxation begins already in the planning stage.',
+    tagline: 'Lillybeth Guesthouses – Quality and Comfort in the heart of Keszthely – just a few steps from Lake Balaton.',
     contact: 'Contact',
     comingSoon: 'Coming Soon'
   },
@@ -41,7 +41,7 @@ const content = {
       'Buchen Sie direkt bei uns und sichern Sie sich den garantiert besten Preis – ohne versteckte Kosten durch direkten Kontakt zum Gastgeber.',
     contactIntro:
       'Bis dahin sind wir jederzeit persönlich unter folgenden Kontaktdaten für Sie da:',
-    tagline: 'Lillybeth Gästehäuser – Premium Aufenthalt am Plattensee.',
+    tagline: 'Lillybeth – Qualität und Komfort im Herzen von Keszthely – nur wenige Schritte zum Plattensee.',
     contact: 'Kontaktdaten',
     comingSoon: 'Demnächst verfügbar'
   }

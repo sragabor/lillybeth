@@ -21,14 +21,14 @@ export const hu = {
 
   // Hero Section
   hero: {
-    headline: 'Lillybeth® Vendégházak',
-    subtitle: 'Ahol a pihenés már a tervezésnél elkezdődik',
-    scrollDown: 'Görgessen a felfedezéshez'
+    headline: 'Lillybeth®',
+    subtitle: 'Minőség és kényelem Keszthely szívében – a Balatontól csupán pár lépésre',
+    scrollDown: 'Fedezze fel a Lillybeth világát'
   },
 
   // Search Section
   search: {
-    title: 'Találja meg tökéletes szállását',
+    title: 'Foglaljon közvetlenül nálunk a legjobb áron',
     checkIn: 'Érkezés',
     checkOut: 'Távozás',
     guests: 'Vendégek',
@@ -56,7 +56,7 @@ export const hu = {
     anyAccommodation: 'Bármely szállás',
     selectAccommodation: 'Válasszon ki legalább egy szállást az eredmények megtekintéséhez',
     showAll: 'Összes megjelenítése',
-    startSearchTitle: 'Találja meg tökéletes szállását',
+    startSearchTitle: 'Foglaljon közvetlenül nálunk a legjobb áron',
     startSearchDescription:
       'Válassza ki a dátumokat és a vendégek számát a fenti mezőkben az elérhető szállások megtekintéséhez.'
   },
@@ -67,7 +67,7 @@ export const hu = {
     subtitle:
       'Két, igényesen kialakított vendégház 25 illetve 22 fő befogadóképességgel\n' +
       'Klasszikus stílus & modern felszereltség & prémium komfort',
-    viewAll: 'Összes épület',
+    viewAll: 'Vendégházaink megtekintése',
     viewDetails: 'Részletek',
     learnMore: 'Tudjon meg többet',
     capacity: 'max {count} fő',
@@ -76,13 +76,17 @@ export const hu = {
 
   // About Section (homepage)
   about: {
-    title: 'A Lillybeth®-ről',
-    subtitle: 'Prémium pihenés a Balatonnál',
-    content: `Üdvözöljük a Lillybeth® Vendégházakban, ahol a foglalás gyors, egyszerű és kényelmes. Már az első kattintástól érezni fogja: jó helyen jár.
+    title: 'Köszöntjük a Lillybeth világában',
+    subtitle: 'Kivételes elhelyezkedés Keszthelyen – a Balaton közelsége, kényelem és elegancia tökéletes harmóniában',
+    content: `Szálláshelyeink egymástól mindössze 100 méterre, a Balatontól csupán pár lépésre találhatók, csendes, kertvárosi környezetben. A madárcsicsergés, a friss levegő és a Balaton illata teremti meg a valódi kikapcsolódást.
 
-Foglaljon közvetlenül nálunk, garantáltan a legjobb áron, rejtett költségek nélkül – közvetlen kapcsolatban a szállásadóval.
+A környék gazdag élményekben – festői természeti környezet, kulturális látnivalók és aktív kikapcsolódási lehetőségek várják. Kiváló elhelyezkedésünknek köszönhetően minden könnyedén elérhető, miközben a nyugalom és a diszkrét elegancia végigkíséri tartózkodását.
 
-Hiszünk abban, hogy a kivételes vendégélmény már a tervezésnél elkezdődik – időt szánunk a Balaton szépségének megbecsülésére, élvezzük a csendes pillanatokat, és egy életen át tartó emlékeket teremtünk.`
+Otthon a Balatonnál
+
+A vendégszeretet nálunk alapérték. A Lillybeth klasszikus eleganciát, modern kényelmet és makulátlan tisztaságot kínál, így teremtve gondtalan pihenést.
+
+Ideális választás pároknak, baráti társaságoknak, kerékpárosoknak és természetkedvelőknek – mindazok számára, akik az aktív feltöltődés és a nyugodt elvonulás egyensúlyát keresik az év bármely szakában.`
   },
 
   // About Page
@@ -90,15 +94,15 @@ Hiszünk abban, hogy a kivételes vendégélmény már a tervezésnél elkezdőd
     title: 'Rólunk',
     contactTitle: 'Kapcsolat',
     mapTitle: 'Találjon meg minket',
-    mapSubtitle: 'Épületeink a Balatonnál',
-    buildingsTitle: 'Épületeink',
+    mapSubtitle: 'Szállásaink a Balatonnál',
+    buildingsTitle: 'Szállásaink',
     noContent: 'Tartalom hamarosan...'
   },
 
   // Gallery Section
   gallery: {
     title: 'Galéria',
-    subtitle: 'Pillanatok a jövőbeli menedékéből',
+    subtitle: 'A Lillybeth hangulata képekben',
     viewAll: 'Összes fotó'
   },
 
@@ -111,7 +115,7 @@ Hiszünk abban, hogy a kivételes vendégélmény már a tervezésnél elkezdőd
 
   // Footer
   footer: {
-    tagline: 'Békés menedéke vár',
+    tagline: 'Stílusos – kifinomult – különleges',
     contact: {
       title: 'Kapcsolat',
       email: 'E-mail',

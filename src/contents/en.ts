@@ -21,14 +21,14 @@ export const en = {
 
   // Hero Section
   hero: {
-    headline: 'Lillybeth® Guesthouses',
-    subtitle: 'Where relaxation begins already in the planning stage',
+    headline: 'Lillybeth®',
+    subtitle: 'Quality and Comfort in the heart of Keszthely – just a few steps from Lake Balaton',
     scrollDown: 'Scroll to explore'
   },
 
   // Search Section
   search: {
-    title: 'Find Your Perfect Stay',
+    title: 'Book now - best price guaranteed',
     checkIn: 'Check-in',
     checkOut: 'Check-out',
     guests: 'Guests',
@@ -56,7 +56,7 @@ export const en = {
     anyAccommodation: 'Any accommodation',
     selectAccommodation: 'Select at least one accommodation to see results',
     showAll: 'Show all',
-    startSearchTitle: 'Find Your Perfect Stay',
+    startSearchTitle: 'Book now - best price guaranteed',
     startSearchDescription:
       'Select your dates and number of guests above to see available accommodations.'
   },
@@ -67,7 +67,7 @@ export const en = {
     subtitle:
       'Two houses with capacity for 25 and 22 guests. ' +
       'Stylish interiors & modern amenities & premium comfort',
-    viewAll: 'View All Accommodations',
+    viewAll: 'View all accommodations',
     viewDetails: 'View Details',
     learnMore: 'Learn more',
     capacity: 'max {count} guests',
@@ -76,13 +76,18 @@ export const en = {
 
   // About Section (homepage)
   about: {
-    title: 'About Lillybeth®',
-    subtitle: 'Premium stay at Lake Balaton',
-    content: `Welcome to Lillybeth® Guesthouses, where booking your stay is fast, simple and convenient. From the first click, you'll feel you're in the right place.
+    title: 'Welcome to Lillybeth',
+    subtitle: 'Top location in Keszthely – peace, nature, and Lake Balaton just steps away',
+    content: `Our accommodations are located only 100 meters apart – A few steps from Lake Balaton, in the heart of Keszthely, yet in a quiet, green residential area. Birdsongs, fresh air, and the gentle scent of lake Balaton accompany your stay.
 
-Book directly with us and enjoy the guaranteed best price, with no hidden fees and direct contact with the accommodation provider.
+The region offers numerous excursion opportunities – from nature experiences to cultural highlights. Thanks to the excellent location, everything is within easy reach while you still enjoy peace and tranquility.
 
-We believe in providing an exceptional guest experience that begins already in the planning stage – taking time to appreciate the beauty of Lake Balaton, savoring quiet moments, and creating memories that last a lifetime.`
+Your home at Lake Balaton
+
+Hospitality is at the heart of everything we do. Lillybeth combines classic style with modern amenities, offering exceptional comfort and immaculate cleanliness.
+
+Ideal for couples, groups of friends, cyclists, nature lovers, and guests seeking both active and relaxing holidays all year round.
+`
   },
 
   // About Page
@@ -98,7 +103,7 @@ We believe in providing an exceptional guest experience that begins already in t
   // Gallery Section
   gallery: {
     title: 'Gallery',
-    subtitle: 'Glimpses of your future escape',
+    subtitle: 'Insights over the accommodations and surroundings',
     viewAll: 'View All Photos'
   },
 
@@ -111,7 +116,7 @@ We believe in providing an exceptional guest experience that begins already in t
 
   // Footer
   footer: {
-    tagline: 'Your peaceful retreat awaits',
+    tagline: 'Stylish – refined – special',
     contact: {
       title: 'Contact',
       email: 'Email',

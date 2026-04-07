@@ -21,14 +21,14 @@ export const de = {
 
   // Hero Section
   hero: {
-    headline: 'Lillybeth® Gästehäuser',
-    subtitle: 'Premium Aufenthalt am Plattensee',
+    headline: 'Lillybeth®',
+    subtitle: 'Qualität und Komfort im Herzen von Keszthely – nur wenige Schritte zum Plattensee',
     scrollDown: 'Scrollen zum Entdecken'
   },
 
   // Search Section
   search: {
-    title: 'Finden Sie Ihren perfekten Aufenthalt',
+    title: 'Direktbuchung zum besten Preis',
     checkIn: 'Anreise',
     checkOut: 'Abreise',
     guests: 'Gäste',
@@ -56,7 +56,7 @@ export const de = {
     anyAccommodation: 'Alle Unterkünfte',
     selectAccommodation: 'Wählen Sie mindestens eine Unterkunft aus, um Ergebnisse zu sehen',
     showAll: 'Alle anzeigen',
-    startSearchTitle: 'Finden Sie Ihren perfekten Aufenthalt',
+    startSearchTitle: 'Direktbuchung zum besten Preis',
     startSearchDescription:
       'Wählen Sie oben Ihre Daten und die Anzahl der Gäste aus, um verfügbare Unterkünfte zu sehen.'
   },
@@ -67,7 +67,7 @@ export const de = {
     subtitle:
       'Zwei Häuser mit Kapazität für 25 und 22 Personen. ' +
       'Stilvolle Einrichtung & moderne Ausstattung & Premium Komfort',
-    viewAll: 'Alle Häuser ansehen',
+    viewAll: 'Alle Unterkünfte ansehen',
     viewDetails: 'Details ansehen',
     learnMore: 'Mehr erfahren',
     capacity: 'max {count} Gäste',
@@ -76,13 +76,18 @@ export const de = {
 
   // About Section (homepage)
   about: {
-    title: 'Über Lillybeth®',
-    subtitle: 'Premium Aufenthalt am Plattensee',
-    content: `Willkommen bei Lillybeth® Gästehäuser, wo die Buchung schnell, einfach und bequem ist. Schon beim ersten Klick werden Sie spüren: Hier sind Sie richtig!
+    title: 'Willkommen bei Lillybeth',
+    subtitle: 'Top Lage in Keszthely – Ruhe, Natur und der Plattensee ganz nah',
+    content: `Unsere Unterkünfte befinden sich nur etwa 100 Meter voneinander entfernt – Nur wenige Schritte vom Plattensee, im Herzen von Keszthely und dennoch in einer ruhigen, grünen Wohngegend. Vogelgezwitscher, frische Luft und der Duft des Plattensees begleiten Ihren Aufenthalt.
 
-Buchen Sie direkt bei uns und sichern Sie sich den garantiert besten Preis – ohne versteckte Kosten durch direkten Kontakt zum Gastgeber.
+Die Region bietet zahlreiche Ausflugsmöglichkeiten – von Naturerlebnissen bis hin zu kulturellen Highlights. Dank der hervorragenden Lage können Sie alles bequem erreichen und gleichzeitig die Ruhe genießen.
 
-Wir glauben daran, ein außergewöhnliches Gästeerlebnis zu bieten, das bereits bei der Planung beginnt – sich Zeit nehmen, die Schönheit des Plattensees zu genießen, ruhige Momente zu erleben und Erinnerungen zu schaffen, die ein Leben lang halten.`
+Ihr Zuhause am Plattensee
+
+Gastfreundschaft steht bei uns an erster Stelle. Lillybeth vereint klassischen Stil mit moderner Ausstattung und bietet höchsten Komfort sowie makellose Sauberkeit.
+
+Ideal für Paare, Freundesgruppen, Radfahrer, Naturliebhaber und Gäste, die eine aktive oder entspannte Erholung zu jeder Jahreszeit suchen
+`
   },
 
   // About Page
@@ -97,8 +102,8 @@ Wir glauben daran, ein außergewöhnliches Gästeerlebnis zu bieten, das bereits
 
   // Gallery Section
   gallery: {
-    title: 'Galerie',
-    subtitle: 'Einblicke in Ihren zukünftigen Rückzugsort',
+    title: 'Galeria',
+    subtitle: 'Einblicke in die Unterkünfte und Umgebung',
     viewAll: 'Alle Fotos ansehen'
   },
 
@@ -111,7 +116,7 @@ Wir glauben daran, ein außergewöhnliches Gästeerlebnis zu bieten, das bereits
 
   // Footer
   footer: {
-    tagline: 'Ihr friedlicher Rückzugsort erwartet Sie',
+    tagline: 'Stilvoll – fein – besonders',
     contact: {
       title: 'Kontakt',
       email: 'E-Mail',

@@ -19,6 +19,7 @@ export const siteConfig = {
   contact: {
     email: 'info@lillybeth.hu',
     phone: '+36 70 531 6016',
+    phone2: '+43 670 4047544',
     whatsapp: '+36705316016', // Without spaces for WhatsApp link
   },
 

@@ -16,7 +16,7 @@ Addig is örömmel segítünk személyesen az alábbi elérhetőségeken:
 📧 info@lillybeth.hu  
 📞 Telefon / WhatsApp: +36 70 531 6016
 
-**Lillybeth Vendégházak – ahol a pihenés már a tervezésnél elkezdődik.**
+**Lillybeth Vendégházak – Minőség és kényelem Keszthely szívében – a Balatontól csupán pár lépésre.**
 
 ---
 
@@ -33,7 +33,7 @@ Until then, we are happy to assist you personally via the following contact deta
 📧 info@lillybeth.hu  
 📞 Phone / WhatsApp: +36 70 531 6016
 
-**Lillybeth Guesthouses – where relaxation begins already in the planning stage.**
+**Lillybeth Guesthouses – Quality and Comfort in the heart of Keszthely – just a few steps from Lake Balaton.**
 
 ---
 
@@ -51,4 +51,4 @@ Bis dahin sind wir jederzeit persönlich unter folgenden Kontaktdaten für Sie d
 📧 info@lillybeth.hu  
 📞 Telefon / WhatsApp: +36 70 531 6016
 
-**Lillybeth Gästehäuser – Premium Aufenthalt am Plattensee.**
+**Lillybeth Gästehäuser – Qualität und Komfort im Herzen von Keszthely – nur wenige Schritte zum Plattensee.**

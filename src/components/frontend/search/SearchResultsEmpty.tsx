@@ -32,7 +32,7 @@ export function SearchResultsEmpty({ guests, isEmptySearch = false }: SearchResu
           </div>
 
           <h3 className="text-lg font-semibold text-stone-800 mb-2">
-            {t.search.startSearchTitle || 'Find Your Perfect Stay'}
+            {t.search.startSearchTitle || 'Book now - best price guaranteed'}
           </h3>
 
           <p className="text-stone-600 mb-4 max-w-md mx-auto">
