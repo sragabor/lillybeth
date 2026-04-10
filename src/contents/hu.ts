@@ -99,6 +99,12 @@ Ideális választás pároknak, baráti társaságoknak, kerékpárosoknak és t
     noContent: 'Tartalom hamarosan...'
   },
 
+  // Reviews Section
+  reviews: {
+    title: 'Vendégeink véleménye',
+    subtitle: 'Valódi élmények vendégeinktől',
+  },
+
   // Gallery Section
   gallery: {
     title: 'Galéria',

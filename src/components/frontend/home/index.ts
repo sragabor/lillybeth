@@ -4,3 +4,4 @@ export { BuildingsSection } from './BuildingsSection';
 export { AboutSection } from './AboutSection';
 export { GallerySection } from './GallerySection';
 export { MapSection } from './MapSection';
+export { ReviewsSection } from './ReviewsSection';

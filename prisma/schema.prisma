@@ -36,6 +36,7 @@ model Building {
   images             BuildingImage[]
   houseRules         HouseRule[]
   roomTypes          RoomType[]
+  reviews            ReviewBuilding[]
 
   @@map("buildings")
 }
@@ -350,4 +351,35 @@ model SpecialDay {
   updatedAt DateTime @updatedAt
 
   @@map("special_days")
+}
+
+enum ReviewLanguage {
+  EN
+  HU
+  DE
+}
+
+model Review {
+  id        String           @id @default(cuid())
+  name      String
+  title     String?
+  text      String
+  country   String
+  language  ReviewLanguage
+  rating    Int              @default(5)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  buildings ReviewBuilding[]
+
+  @@map("reviews")
+}
+
+model ReviewBuilding {
+  reviewId   String
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@id([reviewId, buildingId])
+  @@map("review_buildings")
 }

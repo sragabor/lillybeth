@@ -100,6 +100,12 @@ Ideal für Paare, Freundesgruppen, Radfahrer, Naturliebhaber und Gäste, die ein
     noContent: 'Inhalt folgt bald...'
   },
 
+  // Reviews Section
+  reviews: {
+    title: 'Was unsere Gäste sagen',
+    subtitle: 'Echte Erfahrungen unserer Gäste',
+  },
+
   // Gallery Section
   gallery: {
     title: 'Galeria',

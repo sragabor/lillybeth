@@ -6,6 +6,7 @@ import {
   AboutSection,
   GallerySection,
   MapSection,
+  ReviewsSection,
 } from '@/components/frontend/home';
 import { JsonLd } from '@/components/frontend/seo/JsonLd';
 import { siteConfig } from '@/config';
@@ -83,6 +84,7 @@ export default function FrontendHomePage() {
       <BuildingsSection />
       <AboutSection />
       <GallerySection />
+      <ReviewsSection />
       <MapSection />
     </>
   );

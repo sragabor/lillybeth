@@ -11,6 +11,7 @@ import { AccommodationRules } from '@/components/frontend/accommodation/Accommod
 import { AccommodationLocation } from '@/components/frontend/accommodation/AccommodationLocation';
 import { RoomTypesSection } from '@/components/frontend/accommodation/RoomTypesSection';
 import { BookingCart } from '@/components/frontend/accommodation/BookingCart';
+import { ReviewsSection } from '@/components/frontend/home/ReviewsSection';
 import Link from 'next/link';
 
 interface AccommodationImage {
@@ -236,6 +237,9 @@ export function AccommodationDetailPage({ slug, routeLanguage }: AccommodationDe
         depositInfo={getLocalizedText(accommodation.depositInfo)}
         getLocalizedText={getLocalizedText}
       />
+
+      {/* Reviews for this building */}
+      <ReviewsSection buildingId={accommodation.id} />
 
       {/* Room Types - vertical list with image left layout */}
       {accommodation.roomTypes.length > 0 && (
