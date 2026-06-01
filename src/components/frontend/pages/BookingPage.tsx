@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useFrontendLanguage } from '@/contexts/FrontendLanguageContext';
 import { useBookingCart } from '@/contexts/BookingCartContext';
 import { replacePlaceholders } from '@/contents';
+import { parseDateParam } from '@/lib/dateUtils';
 
 interface AdditionalPriceOption {
   id: string;
@@ -367,7 +368,7 @@ export function BookingPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseDateParam(dateStr);
     return date.toLocaleDateString(
       language === 'hu' ? 'hu-HU' : language === 'de' ? 'de-DE' : 'en-US',
       { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }

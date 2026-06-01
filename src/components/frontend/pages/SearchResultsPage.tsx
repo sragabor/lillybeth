@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useFrontendLanguage } from '@/contexts/FrontendLanguageContext';
 import { useBookingCart } from '@/contexts/BookingCartContext';
+import { toLocalDateString, parseDateParam } from '@/lib/dateUtils';
 import { BestMatchCard } from '@/components/frontend/search/BestMatchCard';
 import { SearchResultRoomTypeCard } from '@/components/frontend/search/SearchResultRoomTypeCard';
 import { SearchResultsLoading } from '@/components/frontend/search/SearchResultsLoading';
@@ -104,10 +105,10 @@ export function SearchResultsPage() {
   const [selectedAccommodationIds, setSelectedAccommodationIds] = useState<string[]>([]);
 
   const [modifyCheckIn, setModifyCheckIn] = useState<Date | null>(
-    checkInParam ? new Date(checkInParam) : null
+    checkInParam ? parseDateParam(checkInParam) : null
   );
   const [modifyCheckOut, setModifyCheckOut] = useState<Date | null>(
-    checkOutParam ? new Date(checkOutParam) : null
+    checkOutParam ? parseDateParam(checkOutParam) : null
   );
   const [modifyGuests, setModifyGuests] = useState(
     guestsParam ? parseInt(guestsParam, 10) : 2
@@ -165,8 +166,8 @@ export function SearchResultsPage() {
     if (!modifyCheckIn || !modifyCheckOut) return;
 
     const params = new URLSearchParams({
-      checkIn: modifyCheckIn.toISOString().split('T')[0],
-      checkOut: modifyCheckOut.toISOString().split('T')[0],
+      checkIn: toLocalDateString(modifyCheckIn),
+      checkOut: toLocalDateString(modifyCheckOut),
       guests: modifyGuests.toString(),
     });
 
@@ -234,7 +235,7 @@ export function SearchResultsPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseDateParam(dateStr);
     return date.toLocaleDateString(language === 'hu' ? 'hu-HU' : language === 'de' ? 'de-DE' : 'en-US', {
       month: 'short',
       day: 'numeric',

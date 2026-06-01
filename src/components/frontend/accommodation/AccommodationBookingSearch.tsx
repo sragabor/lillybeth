@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFrontendLanguage } from '@/contexts/FrontendLanguageContext';
 import { DateRangePicker } from '@/components/frontend/ui/DateRangePicker';
+import { toLocalDateString } from '@/lib/dateUtils';
 
 interface AccommodationBookingSearchProps {
   accommodationId: string;
@@ -23,8 +24,8 @@ export function AccommodationBookingSearch({
     if (!checkIn || !checkOut) return;
 
     const params = new URLSearchParams({
-      checkIn: checkIn.toISOString().split('T')[0],
-      checkOut: checkOut.toISOString().split('T')[0],
+      checkIn: toLocalDateString(checkIn),
+      checkOut: toLocalDateString(checkOut),
       guests: guests.toString(),
       accommodationId: accommodationId,
     });
