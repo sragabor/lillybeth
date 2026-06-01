@@ -221,7 +221,7 @@ Ideal für Paare, Freundesgruppen, Radfahrer, Naturliebhaber und Gäste, die ein
     secureBooking: 'Ihre Buchung ist sicher und wird sofort bestätigt',
     confirmationTitle: 'Buchung bestätigt!',
     confirmationMessage:
-      'Vielen Dank für Ihre Buchung. Wir haben eine Bestätigungs-E-Mail an Ihre Adresse gesendet.',
+      'Vielen Dank für Ihre Buchung. Wir werden uns in Kürze bei Ihnen melden.',
     referenceNumber: 'Referenznummer',
     clearCart: 'Alles löschen',
     selectDates: 'Datum auswählen',

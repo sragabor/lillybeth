@@ -133,7 +133,7 @@ export function ThankYouPage() {
               {t.booking?.confirmationTitle || 'Booking Confirmed!'}
             </h1>
             <p className="text-white/90 text-sm md:text-base">
-              {t.booking?.confirmationMessage || 'Thank you for your booking. We have sent a confirmation email to your address.'}
+              {t.booking?.confirmationMessage || 'Thank you for your booking. We will contact you soon.'}
             </p>
           </div>
 

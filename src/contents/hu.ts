@@ -219,7 +219,7 @@ Ideális választás pároknak, baráti társaságoknak, kerékpárosoknak és t
     processing: 'Feldolgozás...',
     secureBooking: 'Foglalása biztonságos és azonnal megerősített',
     confirmationTitle: 'Foglalás megerősítve!',
-    confirmationMessage: 'Köszönjük foglalását. Megerősítő e-mailt küldtünk az Ön címére.',
+    confirmationMessage: 'Köszönjük foglalását. Hamarosan jelentkezünk',
     referenceNumber: 'Hivatkozási szám',
     clearCart: 'Összes törlése',
     selectDates: 'Dátum kiválasztása',
