@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 interface CartItem {
   roomTypeId: string;
@@ -272,6 +273,26 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      const totalGuestCount = items.reduce((sum: number, item: CartItem) => {
+        const gc = item.guestCounts || Array(item.quantity).fill(1);
+        return sum + gc.reduce((s: number, g: number) => s + g, 0);
+      }, 0);
+
+      await createNotification({
+        type: 'NEW_WEBSITE_BOOKING',
+        bookingId: booking.id,
+        payload: {
+          guestName: data.guestName,
+          guestEmail: data.guestEmail || null,
+          guestPhone: data.guestPhone || null,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          guestCount: totalGuestCount,
+          source: 'WEBSITE',
+          totalAmount: calculatedTotalAmount,
+        },
+      }).catch((err) => console.error('Failed to create notification:', err));
+
       return NextResponse.json({
         success: true,
         type: 'single',
@@ -335,6 +356,26 @@ export async function POST(request: NextRequest) {
           },
         },
       });
+
+      const groupGuestCount = items.reduce((sum: number, item: CartItem) => {
+        const gc = item.guestCounts || Array(item.quantity).fill(1);
+        return sum + gc.reduce((s: number, g: number) => s + g, 0);
+      }, 0);
+
+      await createNotification({
+        type: 'NEW_WEBSITE_GROUP_BOOKING',
+        groupBookingId: group.id,
+        payload: {
+          guestName: data.guestName,
+          guestEmail: data.guestEmail || null,
+          guestPhone: data.guestPhone || null,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          guestCount: groupGuestCount,
+          source: 'WEBSITE',
+          totalAmount: calculatedTotalAmount,
+        },
+      }).catch((err) => console.error('Failed to create notification:', err));
 
       return NextResponse.json({
         success: true,

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { NotificationBell } from './NotificationBell'
 
 interface AdminSidebarProps {
   user: {
@@ -120,20 +121,23 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
         <Link href="/admin/calendar" className="font-semibold text-stone-800">
           Lillybeth Admin
         </Link>
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-        >
-          {mobileMenuOpen ? (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell align="right" />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+          >
+            {mobileMenuOpen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu overlay */}
@@ -147,11 +151,12 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
       {/* Sidebar */}
       <aside className={`fixed left-0 top-0 h-screen w-64 bg-white border-r border-stone-200 flex flex-col z-50 transform transition-transform duration-200 ease-in-out md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Logo */}
-      <div className="p-6 border-b border-stone-100">
+      <div className="px-6 py-5 border-b border-stone-100 flex items-center justify-between">
         <Link href="/admin/calendar" className="block">
           <h1 className="font-semibold text-xl text-stone-800">Lillybeth</h1>
           <span className="text-xs text-stone-500 uppercase tracking-wider">Admin Panel</span>
         </Link>
+        <NotificationBell align="left" />
       </div>
 
       {/* Navigation */}

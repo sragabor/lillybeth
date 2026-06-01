@@ -5,7 +5,8 @@ export function toLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function parseDateParam(dateStr: string): Date {
+export function parseDateParam(dateStr: string | null | undefined): Date {
+  if (!dateStr) return new Date();
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
 }

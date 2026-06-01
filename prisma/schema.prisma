@@ -383,3 +383,17 @@ model ReviewBuilding {
   @@id([reviewId, buildingId])
   @@map("review_buildings")
 }
+
+model AdminNotification {
+  id             String    @id @default(cuid())
+  type           String
+  title          String
+  bookingId      String?
+  groupBookingId String?
+  payload        Json      @default("{}")
+  isRead         Boolean   @default(false)
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@map("admin_notifications")
+}

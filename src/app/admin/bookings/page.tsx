@@ -1,13 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Building, AvailableRoom } from './types'
-import { GlobalFilters, BookingListView, BookingModal, CreateBookingGroupModal } from './components'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Building, AvailableRoom, Booking } from './types'
+import {
+  GlobalFilters,
+  BookingListView,
+  BookingModal,
+  BookingGroupModal,
+  CreateBookingGroupModal,
+} from './components'
 import { getLocalizedText } from '@/lib/i18n/utils'
 import { useLanguage } from '@/contexts/LanguageContext'
 
 export default function BookingsPage() {
   const { language } = useLanguage()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [buildings, setBuildings] = useState<Building[]>([])
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,10 +31,22 @@ export default function BookingsPage() {
   const [listFilterEndDate, setListFilterEndDate] = useState('')
   const [listFilterRoomId, setListFilterRoomId] = useState('')
 
-  // Booking modals
+  // Create booking modals
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showGroupBookingModal, setShowGroupBookingModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // Notification-triggered edit modals
+  const [notifEditingBooking, setNotifEditingBooking] = useState<Booking | null>(null)
+  const [showNotifBookingModal, setShowNotifBookingModal] = useState(false)
+  const [notifGroupId, setNotifGroupId] = useState<string | null>(null)
+  const [showNotifGroupModal, setShowNotifGroupModal] = useState(false)
+
+  // Track which params we've already processed to avoid double-opening
+  const processedParamRef = useRef<string | null>(null)
+
+  const openBookingId = searchParams.get('openBookingId')
+  const openGroupId = searchParams.get('openGroupId')
 
   // Fetch buildings for filters
   const fetchBuildings = useCallback(async () => {
@@ -35,7 +56,6 @@ export default function BookingsPage() {
         const data = await res.json()
         setBuildings(data.buildings || [])
 
-        // Build available rooms list
         const rooms: AvailableRoom[] = []
         data.buildings?.forEach((building: Building) => {
           building.roomTypes?.forEach((roomType) => {
@@ -61,6 +81,37 @@ export default function BookingsPage() {
   useEffect(() => {
     fetchBuildings()
   }, [fetchBuildings])
+
+  // Handle notification URL params — open the referenced booking/group modal
+  useEffect(() => {
+    const paramKey = openBookingId
+      ? `booking:${openBookingId}`
+      : openGroupId
+      ? `group:${openGroupId}`
+      : null
+
+    if (!paramKey || processedParamRef.current === paramKey) return
+    processedParamRef.current = paramKey
+
+    if (openBookingId) {
+      fetch(`/api/admin/bookings/${openBookingId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.booking) {
+            setNotifEditingBooking({ ...data.booking, payments: data.booking.payments ?? [] })
+            setShowNotifBookingModal(true)
+          }
+        })
+        .catch(console.error)
+        .finally(() => {
+          router.replace('/admin/bookings')
+        })
+    } else if (openGroupId) {
+      setNotifGroupId(openGroupId)
+      setShowNotifGroupModal(true)
+      router.replace('/admin/bookings')
+    }
+  }, [openBookingId, openGroupId, router])
 
   // Handle list filter changes
   const handleListFiltersChange = (filters: { startDate: string; endDate: string; roomId: string }) => {
@@ -137,26 +188,57 @@ export default function BookingsPage() {
         />
       </div>
 
-      {/* Booking Modal */}
+      {/* Create booking modal */}
       <BookingModal
         isOpen={showBookingModal}
         onClose={() => setShowBookingModal(false)}
         onSave={() => {
           setShowBookingModal(false)
-          setRefreshKey(prev => prev + 1)
+          setRefreshKey((prev) => prev + 1)
         }}
         editingBooking={null}
         availableRooms={availableRooms}
       />
 
-      {/* Group Booking Modal */}
+      {/* Create group booking modal */}
       <CreateBookingGroupModal
         isOpen={showGroupBookingModal}
         onClose={() => setShowGroupBookingModal(false)}
         onSave={() => {
           setShowGroupBookingModal(false)
-          setRefreshKey(prev => prev + 1)
+          setRefreshKey((prev) => prev + 1)
         }}
+      />
+
+      {/* Notification-opened: edit single booking */}
+      <BookingModal
+        isOpen={showNotifBookingModal}
+        onClose={() => {
+          setShowNotifBookingModal(false)
+          setNotifEditingBooking(null)
+        }}
+        onSave={() => {
+          setShowNotifBookingModal(false)
+          setNotifEditingBooking(null)
+          setRefreshKey((prev) => prev + 1)
+        }}
+        editingBooking={notifEditingBooking}
+        availableRooms={availableRooms}
+      />
+
+      {/* Notification-opened: edit group booking */}
+      <BookingGroupModal
+        isOpen={showNotifGroupModal}
+        onClose={() => {
+          setShowNotifGroupModal(false)
+          setNotifGroupId(null)
+        }}
+        onSave={() => {
+          setShowNotifGroupModal(false)
+          setNotifGroupId(null)
+          setRefreshKey((prev) => prev + 1)
+        }}
+        groupId={notifGroupId}
       />
     </div>
   )

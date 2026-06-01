@@ -375,7 +375,7 @@ export function BookingPage() {
     );
   };
 
-  if (loading || !priceCalculation) {
+  if (loading || !priceCalculation || !dates.checkIn || !dates.checkOut) {
     return (
       <div className="min-h-screen bg-stone-50 pt-24">
         <div className="max-w-6xl mx-auto px-4 py-8">
