@@ -41,12 +41,11 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined)
 
+const POLL_INTERVAL_MS = 10 * 60 * 1000 // 10 minutes
+
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [loading, setLoading] = useState(true)
-  const [sseConnected, setSseConnected] = useState(false)
-  const eventSourceRef = useRef<EventSource | null>(null)
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchNotifications = useCallback(async () => {
@@ -63,63 +62,15 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   }, [])
 
-  const connectSSE = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
-    }
-
-    const es = new EventSource('/api/admin/notifications/stream')
-    eventSourceRef.current = es
-
-    es.onopen = () => {
-      setSseConnected(true)
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
-    }
-
-    es.onmessage = (e) => {
-      const data = JSON.parse(e.data)
-      setNotifications(data.notifications)
-      setLoading(false)
-    }
-
-    es.onerror = () => {
-      setSseConnected(false)
-      es.close()
-      eventSourceRef.current = null
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = setTimeout(connectSSE, 10000)
-    }
-  }, [])
-
   useEffect(() => {
     fetchNotifications()
-    connectSSE()
 
-    return () => {
-      eventSourceRef.current?.close()
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
-      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current)
-    }
-  }, [fetchNotifications, connectSSE])
+    pollingIntervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS)
 
-  // Polling fallback when SSE is disconnected
-  useEffect(() => {
-    if (sseConnected) {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
-      return
-    }
-    pollingIntervalRef.current = setInterval(fetchNotifications, 30000)
     return () => {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current)
     }
-  }, [sseConnected, fetchNotifications])
+  }, [fetchNotifications])
 
   const markAsRead = useCallback(async (id: string) => {
     try {
